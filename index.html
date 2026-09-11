@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files</title>
+<style>
+  :root {
+    --paper: #e9eaee;
+    --tile: #fdfdfc;
+    --ink: #15171c;
+    --quiet: #71757e;
+    --edge: #d2d5dc;
+    --mark: #8c2f26;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: ui-sans-serif, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    max-width: 60ch;
+    margin: 0 auto 2.5rem;
+  }
+
+  h1 {
+    margin: 0 0 .4rem;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--quiet);
+    font-size: .95rem;
+    line-height: 1.5;
+  }
+
+  .files {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: .75rem;
+    max-width: 68rem;
+    margin: 0 auto;
+  }
+
+  .file {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-height: 110px;
+    padding: .85rem .9rem;
+    background: var(--tile);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color .12s ease, transform .12s ease;
+  }
+
+  .file .code {
+    font-size: 2.1rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    line-height: 1;
+  }
+
+  .file .ext {
+    font-size: .78rem;
+    color: var(--quiet);
+    letter-spacing: .04em;
+  }
+
+  .file:hover,
+  .file:focus-visible {
+    border-color: var(--mark);
+    transform: translateY(-2px);
+  }
+
+  .file:hover .ext,
+  .file:focus-visible .ext { color: var(--mark); }
+
+  .file:focus-visible {
+    outline: 2px solid var(--mark);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .file { transition: none; }
+    .file:hover, .file:focus-visible { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Files</h1>
+  <p>Every document in this folder. Pick one to open it.</p>
+</header>
+
+<main class="files">
+  <a class="file" href="/aa.pdf"><span class="code">aa</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/bb.pdf"><span class="code">bb</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/cc.pdf"><span class="code">cc</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/dd.pdf"><span class="code">dd</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ee.pdf"><span class="code">ee</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ff.pdf"><span class="code">ff</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/gg.pdf"><span class="code">gg</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/hh.pdf"><span class="code">hh</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ii.pdf"><span class="code">ii</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/jj.pdf"><span class="code">jj</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/kk.pdf"><span class="code">kk</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ll.pdf"><span class="code">ll</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/mm.pdf"><span class="code">mm</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/nn.pdf"><span class="code">nn</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/oo.pdf"><span class="code">oo</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/pp.pdf"><span class="code">pp</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/qq.pdf"><span class="code">qq</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/rr.pdf"><span class="code">rr</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ss.pdf"><span class="code">ss</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/tt.pdf"><span class="code">tt</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/uu.pdf"><span class="code">uu</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/vv.pdf"><span class="code">vv</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/ww.pdf"><span class="code">ww</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/xx.pdf"><span class="code">xx</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/yy.pdf"><span class="code">yy</span><span class="ext">.pdf</span></a>
+  <a class="file" href="/zz.pdf"><span class="code">zz</span><span class="ext">.pdf</span></a>
+</main>
+
+</body>
+</html>
