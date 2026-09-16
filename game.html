@@ -19,7 +19,7 @@
 <body>
 <div id="wrap">
   <canvas id="c" width="1200" height="760" tabindex="0" aria-label="Blockrot game"></canvas>
-  <div id="bar"><a href="index.html">Back to study files</a><span>P pause · R restart</span></div>
+  <div id="bar"><a href="index.html">Back to study files</a><span>P to pause (restart from the pause screen)</span></div>
 </div>
 <script>
 "use strict";
@@ -65,6 +65,56 @@ const MASTERY_PERKS = [
   'Hardened: +35% damage, shots pierce one more enemy',
   'Dual wield: double shots, +50% ammo'
 ];
+
+// Kill combos are shared: when either player kills something, both alive
+// players' combo multipliers go up. With SHARE_CHAIN on, the partner's mastery
+// chain for whatever weapon THEY are holding goes up too.
+const SHARE_COMBO = true;
+const SHARE_CHAIN = true;
+
+/* ---------------- CONFIG: weapon mods (boss + elite drops) ---------------- */
+// A mod attaches to the weapon you're holding when you pick it up.
+const MODS = {
+  ricochet: { name:'Ricochet',  desc:'Shots bounce off walls (Tesla: +3 chains)', color:'#e6dfc8' },
+  cryo:     { name:'Cryo',      desc:'Hits slow enemies for 2 seconds',          color:'#8fd8ff' },
+  leech:    { name:'Leech',     desc:'Damage you deal heals you a little',        color:'#ff6b8a' },
+  boom:     { name:'Volatile',  desc:'Kills cause a small explosion',             color:'#ffb347' },
+  overclock:{ name:'Overclock', desc:'+25% damage and fire rate',                 color:'#c6ff5a' }
+};
+const ELITE_FROM = 3;   // from this wave, one elite zombie per normal wave drops a mod
+
+/* ---------------- CONFIG: wave modifiers ---------------- */
+const MODIFIERS = {
+  fog:       { name:'Fog',               desc:'You can only see what is close to you' },
+  frenzy:    { name:'Frenzy',            desc:'Zombies move 35% faster' },
+  loot:      { name:'Double loot',       desc:'Twice the pickups and 50% more cash' },
+  volatile:  { name:'Explosive corpses', desc:'Zombies explode when they die. Keep your distance' },
+  armored:   { name:'Armored',           desc:'Zombies have 50% more health, 50% more cash' },
+  swarm:     { name:'Swarm',             desc:'50% more zombies with 30% less health' },
+  bloodmoon: { name:'Blood moon',        desc:'Ranged enemies are common and fire faster' },
+  scarce:    { name:'Scarcity',          desc:'No ammo drops, 30% more cash' }
+};
+const MODIFIERS_FROM = 3, TWO_MODIFIERS_FROM = 9;
+
+/* ---------------- CONFIG: shop (opens after every wave) ---------------- */
+const SHOP = [
+  { id:'armor',  name:'Armor plating',         desc:'+20 max health',                                max:5, cost:l => 600 + 400 * l },
+  { id:'speed',  name:'Sprint boots',          desc:'+8% move speed',                                max:4, cost:l => 500 + 350 * l },
+  { id:'medic',  name:'Field medic',           desc:'Revive your partner faster, medkits heal more', max:3, cost:l => 700 + 500 * l },
+  { id:'kit',    name:'Barricade kit',         desc:'+2 barricade capacity and +2 barricades now',    max:3, cost:l => 500 + 300 * l },
+  { id:'fort',   name:'Reinforced barricades', desc:'Your barricades have 40% more health',          max:3, cost:l => 600 + 400 * l },
+  { id:'cool',   name:'Quick hands',           desc:'Medkit cooldown 15% shorter',                   max:3, cost:l => 500 + 400 * l },
+  { id:'magnet', name:'Scavenger',             desc:'Grab pickups from farther away, +10% cash',     max:3, cost:l => 400 + 300 * l },
+  { id:'heal',   name:'Patch up',              desc:'Restore full health',                           repeat:true, cost:() => 300 },
+  { id:'ammo',   name:'Resupply',              desc:'Refill every weapon, including specials',       repeat:true, cost:() => 450 },
+  { id:'ready',  name:'Ready',                 desc:'The next wave starts when both players are ready' }
+];
+
+/* ---------------- CONFIG: team abilities ---------------- */
+const ENERGY_MAX = 50;        // team kills needed to charge the airstrike
+const STRIKE_WINDOW = 0.8;    // both players must press within this many seconds
+const MEDKIT_CD = 25;         // seconds
+const CASH_RATE = 0.4;        // cash earned per point scored
 
 /* ---------------- CONFIG: enemies ---------------- */
 // from = first wave it can appear, weight = how common it is
@@ -119,11 +169,12 @@ addEventListener('resize', fit); fit();
 const keys = {}, pressed = {};
 const CTRL = [
   { up:['KeyW'], down:['KeyS'], left:['KeyA'], right:['KeyD'],
-    fire:['Space'], swap:['KeyQ'], build:['KeyE'] },
+    fire:['Space'], swap:['KeyQ'], build:['KeyE'], med:['KeyF'], strike:['KeyG'] },
   { up:['ArrowUp'], down:['ArrowDown'], left:['ArrowLeft'], right:['ArrowRight'],
-    fire:['Enter','NumpadEnter','Numpad0'], swap:['ShiftRight','Period'], build:['Slash','Numpad1'] }
+    fire:['Enter','NumpadEnter','Numpad0'], swap:['ShiftRight','Period'], build:['Slash','Numpad1'],
+    med:['Semicolon','Numpad2'], strike:['Quote','Numpad3'] }
 ];
-const BLOCK = new Set(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Slash','Enter','Period','Quote']);
+const BLOCK = new Set(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Slash','Enter','Period','Quote','Semicolon']);
 addEventListener('keydown', e => {
   if (BLOCK.has(e.code)) e.preventDefault();
   if (!keys[e.code]) pressed[e.code] = true;
@@ -238,6 +289,8 @@ let state = 'title', wave = 0, time = 0, shake = 0;
 let players = [], zombies = [], bullets = [], eshots = [], barricades = [], puddles = [];
 let barrels = [], particles = [], pickups = [], loot = [], texts = [], banners = [], beams = [], bolts = [];
 let toSpawn = 0, spawnT = 0, intermission = 0, bossPending = false, bossDelay = 0;
+let clearT = 0, activeMods = new Set(), nextMods = [], teamEnergy = 0, strikes = [], meds = [];
+let eliteAt = -1, boomDepth = 0;
 let camX = WW / 2, camY = WH / 2, zoom = ZMIN;
 let mastery = {};
 let best = 0;
@@ -247,6 +300,8 @@ function newPlayer(i) {
   return { i, x: i ? 1280 : 1120, y: 1100, r: 14, hp: 100, dx: 0, dy: -1, speed: 200,
     slots: [], cur: 0, cd: 0, alive: true, build: 2, score: 0, combo: 0, comboT: 0,
     hurt: 0, rev: 0, walk: 0, chain: {}, chainT: {},
+    cash: 0, up: { armor:0, speed:0, medic:0, kit:0, fort:0, cool:0, magnet:0 },
+    medCd: 0, strikeT: -9, sel: 0, ready: false, msg: '', msgT: 0,
     body: i ? '#2f8fa0' : '#c98a1e', head: i ? '#5fc6d6' : '#f2b134', name: i ? 'P2' : 'P1' };
 }
 
@@ -264,12 +319,17 @@ function maxAmmo(s) {
   if (s.base && mastery[s.base].lv >= 3) m *= 1.5;
   return Math.round(m);
 }
+const maxHp = p => 100 + 20 * p.up.armor;
+const buildCap = p => 6 + 2 * p.up.kit;
+const cashMul = p => (1 + .1 * p.up.magnet) * (activeMods.has('loot') ? 1.5 : 1)
+  * (activeMods.has('armored') ? 1.5 : 1) * (activeMods.has('scarce') ? 1.3 : 1);
 function stats(s) {
   const d = s.def, lv = s.base ? mastery[s.base].lv : 0;
   let dmg = d.dmg, rate = d.rate, pierce = d.pierce || 0, blastMul = 1;
   if (s.rarity === 'rare') { dmg *= 1.5; rate *= .8; pierce += 1; }
   if (lv >= 1) rate *= .75;
   if (lv >= 2) { dmg *= 1.35; pierce += 1; blastMul = 1.25; }
+  if (s.mod === 'overclock') { dmg *= 1.25; rate *= .8; }
   return { dmg, rate, pierce, blastMul, dual: lv >= 3, lv, mult: dmg / d.dmg };
 }
 
@@ -289,7 +349,8 @@ function startGame() {
   players = [newPlayer(0), newPlayer(1)];
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
-  bossPending = false;
+  bossPending = false; clearT = 0; activeMods = new Set(); nextMods = [];
+  teamEnergy = 0; strikes = []; meds = [];
   resetGround(); nextWave();
   updateCam(0, true);
 }
@@ -297,12 +358,15 @@ function startGame() {
 function nextWave() {
   wave++;
   const boss = wave % BOSS_EVERY === 0;
+  activeMods = new Set(nextMods); nextMods = [];
   toSpawn = boss ? 6 + wave * 2 : 8 + wave * 5;
+  if (activeMods.has('swarm')) toSpawn = Math.round(toSpawn * 1.5);
+  eliteAt = (!boss && wave >= ELITE_FROM) ? Math.floor(toSpawn / 2) : -1;
   spawnT = 1.2; intermission = 0;
   for (const p of players) {
     if (!p.alive) { p.alive = true; p.hp = 50; p.hurt = 1; }
-    else p.hp = Math.min(100, p.hp + 25);
-    p.build = Math.min(6, p.build + 2);
+    else p.hp = Math.min(maxHp(p), p.hp + 25);
+    p.build = Math.min(buildCap(p), p.build + 2);
     const baseCount = p.slots.filter(s => s.rarity === 'base').length;
     let ins = baseCount;
     for (const id in W_DEFS) {
@@ -320,6 +384,7 @@ function nextWave() {
     bossPending = true; bossDelay = 3;
     banner('Wave ' + wave + ': boss incoming', '#e2735f', true);
   } else banner('Wave ' + wave, '#e6dfc8', true);
+  for (const m of activeMods) banner(MODIFIERS[m].name + ': ' + MODIFIERS[m].desc, '#c9a0ff');
   for (const id in W_DEFS) {
     if (W_DEFS[id].unlock === wave && wave > 1)
       banner('New weapon: ' + W_DEFS[id].name, '#f2d27a');
@@ -331,10 +396,11 @@ function farGate() {
   return pick(far.length ? far : GATES);
 }
 function makeZombie(type, x, y, inside) {
-  const T = ZT[type], scale = 1 + (wave - 1) * .09;
+  const T = ZT[type];
+  const scale = (1 + (wave - 1) * .09) * (activeMods.has('armored') ? 1.5 : 1) * (activeMods.has('swarm') ? .7 : 1);
   return {
     type, x, y, r: T.r, hp: T.hp * scale, max: T.hp * scale,
-    speed: rand(...T.speed) * (1 + wave * .012), dmg: T.dmg, body: T.body, head: T.head, pts: T.pts,
+    speed: rand(...T.speed) * (1 + wave * .012) * (activeMods.has('frenzy') ? 1.35 : 1), dmg: T.dmg, body: T.body, head: T.head, pts: T.pts,
     ranged: T.ranged, bloat: T.bloat, shield: T.shield, split: T.split, necro: T.necro, dash: T.dash,
     atk: 0, shoot: rand(1.5, 3), heal: 3, dcd: rand(1, 3), dashT: 0,
     inside, wob: rand(0, 6.28), flash: 0, dx: 0, dy: 1, walk: 0, burn: 0, burnDps: 0
@@ -342,10 +408,16 @@ function makeZombie(type, x, y, inside) {
 }
 function spawnZombie() {
   const pool = Object.keys(ZT).filter(k => ZT[k].from <= wave);
-  let tot = pool.reduce((a, k) => a + ZT[k].weight, 0), r = Math.random() * tot, type = pool[0];
-  for (const k of pool) { r -= ZT[k].weight; if (r <= 0) { type = k; break; } }
+  const wt = k => ZT[k].weight * (activeMods.has('bloodmoon') && ZT[k].ranged ? 4 : 1);
+  let tot = pool.reduce((a, k) => a + wt(k), 0), r = Math.random() * tot, type = pool[0];
+  for (const k of pool) { r -= wt(k); if (r <= 0) { type = k; break; } }
   const gt = farGate();
-  zombies.push(makeZombie(type, gt.x + (gt.jx ? rand(-60, 60) : 0), gt.y + (gt.jy ? rand(-60, 60) : 0), false));
+  const z = makeZombie(type, gt.x + (gt.jx ? rand(-60, 60) : 0), gt.y + (gt.jy ? rand(-60, 60) : 0), false);
+  if (toSpawn === eliteAt) {
+    z.elite = true; z.hp *= 4; z.max *= 4; z.r = Math.round(z.r * 1.25); z.pts *= 5;
+    banner('An elite ' + type + ' appeared. It carries a weapon mod', '#f2d27a');
+  }
+  zombies.push(z);
 }
 function spawnBoss() {
   const idx = wave / BOSS_EVERY - 1, B = BOSSES[idx % BOSSES.length];
@@ -424,7 +496,8 @@ function shoot(p, s, st, x, y, a) {
     for (let k = 0; k < 2; k++) {
       const aa = a + rand(-d.spread, d.spread), sp = d.speed * rand(.75, 1);
       bullets.push({ kind: 'flame', x, y, vx: Math.cos(aa) * sp, vy: Math.sin(aa) * sp, dmg: st.dmg,
-        owner: p, slot: s, life: .42, pierce: 99, hit: new Set(), size: 5, color: d.color, burn: d.burn * st.mult });
+        owner: p, slot: s, life: .42, pierce: 99, hit: new Set(), size: 5, color: d.color, burn: d.burn * st.mult,
+        mod: s.mod, bounces: 0 });
     }
     return;
   }
@@ -438,33 +511,45 @@ function shoot(p, s, st, x, y, a) {
       life: d.kind === 'bullet' ? (d.life || .9) : 2.5,
       blast: (d.blast || 0) * st.blastMul, blastDmg: (d.blastDmg || 0) * st.mult,
       pierce: d.kind === 'plasma' ? 99 : st.pierce, hit: new Set(),
-      size: d.size || 3, color: d.color
+      size: d.size || 3, color: d.color, mod: s.mod, bounces: 0
     });
   }
 }
 
 function beam(p, s, st, x, y, a) {
-  const d = s.def, dx = Math.cos(a), dy = Math.sin(a);
-  let len = d.range;
-  for (let t = 0; t < d.range; t += 8) {
+  castBeam(p, s, st, x, y, Math.cos(a), Math.sin(a), s.def.range, s.mod === 'ricochet' ? 2 : 0);
+}
+function castBeam(p, s, st, x, y, dx, dy, range, bounces) {
+  const d = s.def;
+  let len = range, wall = false, rx2 = -dx, ry2 = -dy;
+  for (let t = 6; t < range; t += 6) {
     const px = x + dx * t, py = y + dy * t;
-    if (px < 0 || py < 0 || px > WW || py > WH || (!d.wallpierce && isBlockedAt(px, py))) { len = t; break; }
+    const out = px < 0 || py < 0 || px > WW || py > WH;
+    if (out || (!d.wallpierce && isBlockedAt(px, py))) {
+      len = t; wall = true;
+      const qx = x + dx * (t - 6), qy = y + dy * (t - 6);
+      const hx = isBlockedAt(px, qy), hy = isBlockedAt(qx, py);
+      if (hx || hy) { rx2 = hx ? -dx : dx; ry2 = hy ? -dy : dy; }
+      break;
+    }
   }
   const w = (d.width || 3) / 2;
   const hits = [];
   for (const z of zombies) {
     if (z.dead) continue;
-    const rx = z.x - x, ry = z.y - y, t = rx * dx + ry * dy;
-    if (t > 0 && t < len && Math.abs(rx * dy - ry * dx) < z.r + w) hits.push(z);
+    const ox = z.x - x, oy = z.y - y, t = ox * dx + oy * dy;
+    if (t > 0 && t < len && Math.abs(ox * dy - oy * dx) < z.r + w) hits.push(z);
   }
   for (const z of hits) damage(z, st.dmg, p, s, dx, dy, true);
   for (const b of barrels) {
     if (!b.alive) continue;
-    const rx = b.x - x, ry = b.y - y, t = rx * dx + ry * dy;
-    if (t > 0 && t < len && Math.abs(rx * dy - ry * dx) < b.r + w) blowBarrel(b, p, s);
+    const ox = b.x - x, oy = b.y - y, t = ox * dx + oy * dy;
+    if (t > 0 && t < len && Math.abs(ox * dy - oy * dx) < b.r + w) blowBarrel(b, p, s);
   }
   beams.push({ x1: x, y1: y, x2: x + dx * len, y2: y + dy * len, w: d.width || 3, color: d.color, life: .07, max: .07 });
   burst(x + dx * len, y + dy * len, d.color, 2, 80, 3);
+  if (wall && bounces > 0 && len > 12)
+    castBeam(p, s, st, x + dx * (len - 6), y + dy * (len - 6), rx2, ry2, range * .7, bounces - 1);
 }
 
 function zig(a, b) {
@@ -490,7 +575,7 @@ function arc(p, s, st, x, y, a) {
   }
   const hit = new Set();
   let from = { x, y }, cur = first, dmg = st.dmg;
-  const chains = d.chains + (st.lv >= 2 ? 1 : 0);
+  const chains = d.chains + (st.lv >= 2 ? 1 : 0) + (s.mod === 'ricochet' ? 3 : 0);
   for (let i = 0; i <= chains && cur; i++) {
     hit.add(cur);
     bolts.push({ pts: zig(from, cur), color: d.color, life: .12, max: .12 });
@@ -515,7 +600,8 @@ function build(p) {
   if (barricades.some(b => b.x === gx && b.y === gy)) return;
   const touches = e => Math.hypot(e.x - clamp(e.x, gx, gx + CELL), e.y - clamp(e.y, gy, gy + CELL)) < e.r;
   if (players.some(q => q.alive && touches(q)) || zombies.some(touches) || barrels.some(b => b.alive && touches(b))) return;
-  barricades.push({ x: gx, y: gy, hp: 180, max: 180 });
+  const bhp = 180 * (1 + .4 * p.up.fort);
+  barricades.push({ x: gx, y: gy, hp: bhp, max: bhp });
   p.build--;
   burst(gx + 20, gy + 20, '#a07a45', 6, 80);
 }
@@ -549,6 +635,8 @@ function damage(z, d, owner, slot, kx, ky, bypass) {
     }
   }
   z.hp -= d; z.flash = .08;
+  if (slot && slot.mod === 'cryo') z.slow = 2;
+  if (slot && slot.mod === 'leech' && owner && owner.alive) owner.hp = Math.min(maxHp(owner), owner.hp + d * .03);
   if (!z.boss) {
     const s = Math.hypot(kx, ky) || 1, push = z.type === 'brute' ? 1 : 3;
     z.x += kx / s * push; z.y += ky / s * push;
@@ -558,45 +646,65 @@ function damage(z, d, owner, slot, kx, ky, bypass) {
 }
 
 let newZ = [];
+function advanceChain(q, id) {
+  const m = mastery[id];
+  if (m.lv >= 3) return;
+  q.chain[id] = (q.chain[id] || 0) + 1;
+  q.chainT[id] = CHAIN_WINDOW;
+  if (q.chain[id] < MASTERY_NEED[m.lv]) return;
+  m.lv++;
+  for (const o of players) { o.chain[id] = 0; o.chainT[id] = 0; }
+  banner(`${q.name} mastered the ${W_DEFS[id].name}! Team perk ${'I'.repeat(m.lv)}: ${MASTERY_PERKS[m.lv - 1]}`, '#f2d27a', true);
+  for (const o of players) {
+    burst(o.x, o.y, '#f2d27a', 20, 220, 5);
+    for (const sl of o.slots) if (sl.base === id) { const old = sl.max; sl.max = maxAmmo(sl); if (sl.max !== Infinity) sl.ammo += sl.max - old; }
+  }
+}
+
 function kill(z, owner, slot) {
   if (z.dead) return;
   z.dead = true;
+  teamEnergy = Math.min(ENERGY_MAX, teamEnergy + (z.boss ? 30 : z.elite ? 5 : 1));
   if (owner) {
-    owner.combo++; owner.comboT = 2.2;
+    for (const q of players) {
+      if (q !== owner && !(SHARE_COMBO && q.alive)) continue;
+      q.combo++; q.comboT = 2.2;
+    }
     const pts = z.pts * Math.min(owner.combo, 10);
     owner.score += pts;
+    owner.cash += Math.round(pts * CASH_RATE * cashMul(owner));
     floatText(z.x, z.y - 24, '+' + pts, owner.head);
-    if (slot && slot.base && mastery[slot.base].lv < 3) {
-      const id = slot.base, m = mastery[id];
-      owner.chain[id] = (owner.chain[id] || 0) + 1;
-      owner.chainT[id] = CHAIN_WINDOW;
-      if (owner.chain[id] >= MASTERY_NEED[m.lv]) {
-        {
-          m.lv++;
-          for (const q of players) { q.chain[id] = 0; q.chainT[id] = 0; }
-          banner(`${owner.name} mastered the ${W_DEFS[id].name}! Team perk ${'I'.repeat(m.lv)}: ${MASTERY_PERKS[m.lv - 1]}`, '#f2d27a', true);
-          for (const p of players) {
-            burst(p.x, p.y, '#f2d27a', 20, 220, 5);
-            for (const s of p.slots) if (s.base === slot.base) { const old = s.max; s.max = maxAmmo(s); if (s.max !== Infinity) s.ammo += s.max - old; }
-          }
-        }
-      }
+    if (slot && slot.base) advanceChain(owner, slot.base);
+    if (SHARE_CHAIN) {
+      const mate = players[1 - owner.i], ms = mate.slots[mate.cur];
+      if (mate.alive && ms && ms.base) advanceChain(mate, ms.base);
     }
   }
   splat(z.x, z.y, z.r, 'rgba(110,22,18,.55)');
   burst(z.x, z.y, z.body, z.boss ? 40 : 10, z.boss ? 300 : 180, z.boss ? 9 : 5);
   if (z.bloat) bloatBoom(z);
   if (z.split) for (let k = 0; k < 2; k++) newZ.push(makeZombie('crawler', z.x + rand(-12, 12), z.y + rand(-12, 12), true));
+  if (boomDepth < 5 && !z.boss) {
+    if (slot && slot.mod === 'boom') { boomDepth++; explode(z.x, z.y, 70, 35, owner, slot); boomDepth--; }
+    else if (activeMods.has('volatile')) { boomDepth++; explode(z.x, z.y, 65, 30, owner, slot, 9); boomDepth--; }
+  }
   if (z.boss) { bossDeath(z); return; }
-  const r = Math.random();
-  if (r < .06) pickups.push({ x: z.x, y: z.y, type: 'ammo', life: 15 });
-  else if (r < .1) pickups.push({ x: z.x, y: z.y, type: 'med', life: 15 });
+  if (z.elite) {
+    const l = { x: z.x, y: z.y, r: 12, item: rollMod(), bob: rand(0, 6) };
+    solid(l); loot.push(l);
+    banner('The elite dropped a weapon mod', MODS[l.item.id].color);
+  }
+  const r = Math.random(), dm = activeMods.has('loot') ? 2 : 1;
+  if (r < .06 * dm) { if (!activeMods.has('scarce')) pickups.push({ x: z.x, y: z.y, type: 'ammo', life: 15 }); }
+  else if (r < .1 * dm) pickups.push({ x: z.x, y: z.y, type: 'med', life: 15 });
 }
 
-function explode(x, y, rad, dmg, owner, slot) {
-  shake = Math.max(shake, 10);
-  burst(x, y, '#ffb347', 22, 260, 7);
-  burst(x, y, '#5a5448', 14, 120, 9);
+function explode(x, y, rad, dmg, owner, slot, hurtPlayers = 0) {
+  shake = Math.max(shake, Math.min(10, rad / 10));
+  const big = rad >= 90;
+  burst(x, y, '#ffb347', big ? 22 : 10, rad * 2.4, big ? 7 : 5);
+  burst(x, y, '#5a5448', big ? 14 : 5, 120, 9);
+  if (hurtPlayers) for (const p of players) if (p.alive && Math.hypot(p.x - x, p.y - y) < rad) hurt(p, hurtPlayers);
   g.fillStyle = 'rgba(0,0,0,.3)';
   g.beginPath(); g.arc(x, y, rad * .45, 0, 6.283); g.fill();
   for (const z of zombies) {
@@ -620,22 +728,24 @@ function bloatBoom(z) {
 
 function rollRare() {
   const ids = Object.keys(W_DEFS).filter(k => k !== 'pistol');
-  return { id: pick(ids), rarity: 'rare' };
+  return { kind: 'weapon', id: pick(ids), rarity: 'rare' };
 }
 function rollLegendary() {
   const taken = new Set([...players.flatMap(p => p.slots.filter(s => s.rarity === 'legendary').map(s => s.id)),
                          ...loot.filter(l => l.item.rarity === 'legendary').map(l => l.item.id)]);
   const free = Object.keys(LEGENDARY).filter(k => !taken.has(k));
-  return { id: pick(free.length ? free : Object.keys(LEGENDARY)), rarity: 'legendary' };
+  return { kind: 'weapon', id: pick(free.length ? free : Object.keys(LEGENDARY)), rarity: 'legendary' };
 }
+function rollMod() { return { kind: 'mod', id: pick(Object.keys(MODS)) }; }
 function bossDeath(z) {
   shake = 20;
-  banner(z.name + ' defeated. Grab the loot, one item each', '#ff9f1a', true);
+  banner(z.name + ' defeated. Grab the loot: whoever touches an item keeps it', '#ff9f1a', true);
   const idx = wave / BOSS_EVERY - 1;
   const items = [rollRare(), Math.random() < .35 + idx * .2 ? rollLegendary() : rollRare()];
   if (idx === 1 && !items.some(i => i.rarity === 'legendary')) items[1] = rollLegendary();
+  items.push(rollMod());
   items.forEach((it, k) => {
-    const l = { x: z.x + (k ? 50 : -50), y: z.y, r: 12, item: it, bob: rand(0, 6) };
+    const l = { x: z.x + (k - 1) * 60, y: z.y + (k === 2 ? 40 : 0), r: 12, item: it, bob: rand(0, 6) };
     l.x = clamp(l.x, 30, WW - 30); l.y = clamp(l.y, 30, WH - 30);
     solid(l);
     loot.push(l);
@@ -651,6 +761,82 @@ function gameOver() {
 function eShot(x, y, a, speed, kind) {
   const spec = { fire: [6, 14], acid: [7, 10], orb: [8, 16] }[kind];
   eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: spec[0], dmg: spec[1], kind, life: 2.6 });
+}
+
+/* ---------------- team abilities ---------------- */
+function throwMedkit(p) {
+  const mate = players[1 - p.i];
+  if (p.medCd > 0) { floatText(p.x, p.y - 34, `Medkit in ${Math.ceil(p.medCd)}s`, '#8f8870'); return; }
+  if (mate.alive && mate.hp >= maxHp(mate)) { floatText(p.x, p.y - 34, 'Partner is at full health', '#8f8870'); return; }
+  p.medCd = MEDKIT_CD * (1 - .15 * p.up.cool);
+  meds.push({ from: p, to: mate, x: p.x, y: p.y, sx: p.x, sy: p.y, t: 0, dur: .55 });
+}
+function tryStrike(p) {
+  const mate = players[1 - p.i];
+  p.strikeT = time;
+  if (teamEnergy < ENERGY_MAX) { floatText(p.x, p.y - 34, `Airstrike ${Math.floor(teamEnergy / ENERGY_MAX * 100)}% charged`, '#8f8870'); return; }
+  if (!mate.alive) { floatText(p.x, p.y - 34, 'Needs both players standing', '#e2735f'); return; }
+  if (time - mate.strikeT > STRIKE_WINDOW) { floatText(p.x, p.y - 34, 'Waiting for partner...', '#f2d27a'); return; }
+  teamEnergy = 0; p.strikeT = mate.strikeT = -9;
+  banner('Airstrike inbound', '#ff9a3c', true);
+  const vw = W / zoom / 2, vh = (H - AY) / zoom / 2;
+  const inView = zombies.filter(z => Math.abs(z.x - camX) < vw && Math.abs(z.y - camY) < vh);
+  inView.sort((a, b) => b.max - a.max);
+  for (let k = 0; k < 16; k++) {
+    const tg = inView.length ? inView[k % inView.length] : null;
+    const x = tg ? tg.x + rand(-40, 40) : camX + rand(-vw, vw) * .8;
+    const y = tg ? tg.y + rand(-40, 40) : camY + rand(-vh, vh) * .8;
+    strikes.push({ x, y, t: .6 + k * .1, max: .6 + k * .1, owner: players[k % 2] });
+  }
+}
+
+/* ---------------- shop ---------------- */
+function openShop() {
+  state = 'shop';
+  const upcoming = wave + 1, pool = Object.keys(MODIFIERS);
+  nextMods = [];
+  if (upcoming % BOSS_EVERY !== 0 && upcoming >= MODIFIERS_FROM) {
+    const n = upcoming >= TWO_MODIFIERS_FROM ? 2 : 1;
+    while (nextMods.length < n) { const m = pick(pool); if (!nextMods.includes(m)) nextMods.push(m); }
+  }
+  for (const p of players) {
+    p.ready = false; p.msg = ''; p.sel = 0;
+    if (!p.alive) { p.alive = true; p.hp = Math.round(maxHp(p) / 2); p.hurt = 1; }
+  }
+  eshots = []; puddles = [];
+}
+function buy(p, item) {
+  if (item.id === 'ready') { p.ready = true; return; }
+  const lv = p.up[item.id] || 0;
+  const say = m => { p.msg = m; p.msgT = 2; };
+  if (!item.repeat && lv >= item.max) return say('Already maxed');
+  if (item.id === 'heal' && p.hp >= maxHp(p)) return say('Already at full health');
+  const cost = item.cost(lv);
+  if (p.cash < cost) return say(`Need $${cost - p.cash} more`);
+  p.cash -= cost;
+  if (item.id === 'heal') p.hp = maxHp(p);
+  else if (item.id === 'ammo') for (const sl of p.slots) sl.ammo = sl.max;
+  else {
+    p.up[item.id]++;
+    if (item.id === 'armor') p.hp += 20;
+    if (item.id === 'kit') p.build = Math.min(buildCap(p), p.build + 2);
+  }
+  say('Bought ' + item.name);
+}
+function shopInput(dt) {
+  for (const p of players) {
+    const c = CTRL[p.i];
+    if (p.msgT > 0) p.msgT -= dt;
+    if (p.ready) { if (tap(c.build) || tap(c.fire)) p.ready = false; continue; }
+    if (tap(c.up)) p.sel = (p.sel + SHOP.length - 1) % SHOP.length;
+    if (tap(c.down)) p.sel = (p.sel + 1) % SHOP.length;
+    if (tap(c.fire)) buy(p, SHOP[p.sel]);
+    else if (tap(c.build)) p.ready = true;
+  }
+  if (players.every(p => p.ready)) {
+    state = 'play'; intermission = 3;
+    banner('Get ready', '#e6dfc8');
+  }
 }
 
 /* ---------------- camera ---------------- */
@@ -685,7 +871,7 @@ function update(dt) {
       const mate = players[1 - p.i];
       if (mate.alive && dist(p, mate) < 50) {
         p.rev += dt;
-        if (p.rev >= 3) { p.alive = true; p.hp = 40; p.rev = 0; p.hurt = 1; banner(p.name + ' is back up', '#8fd67a'); }
+        if (p.rev >= 3 - .6 * mate.up.medic) { p.alive = true; p.hp = 40; p.rev = 0; p.hurt = 1; banner(p.name + ' is back up', '#8fd67a'); }
       } else p.rev = Math.max(0, p.rev - dt);
       continue;
     }
@@ -696,7 +882,8 @@ function update(dt) {
       const l = Math.hypot(mx, my); mx /= l; my /= l;
       p.dx = mx; p.dy = my; p.walk += dt * 12;
     }
-    p.x += mx * p.speed * dt; p.y += my * p.speed * dt;
+    const spd = p.speed * (1 + .08 * p.up.speed);
+    p.x += mx * spd * dt; p.y += my * spd * dt;
     const mate = players[1 - p.i];
     p.x = clamp(p.x, mate.x - MAXDX, mate.x + MAXDX);
     p.y = clamp(p.y, mate.y - MAXDY, mate.y + MAXDY);
@@ -705,18 +892,21 @@ function update(dt) {
     p.cd -= dt;
     if (held(c.fire) && p.cd <= 0) fire(p);
     if (tap(c.build)) build(p);
+    if (p.medCd > 0) p.medCd -= dt;
+    if (tap(c.med)) throwMedkit(p);
+    if (tap(c.strike)) tryStrike(p);
     if (p.comboT > 0) { p.comboT -= dt; if (p.comboT <= 0) p.combo = 0; }
     if (p.hurt > 0) p.hurt -= dt;
 
     for (const k of pickups) {
-      if (k.life > 0 && dist(p, k) < 26) {
+      if (k.life > 0 && dist(p, k) < 26 + 40 * p.up.magnet) {
         k.life = 0;
         if (k.type === 'ammo') {
           for (const s of p.slots) if (s.ammo !== Infinity) s.ammo = Math.min(s.max, s.ammo + Math.ceil(s.max / 2));
-          p.build = Math.min(6, p.build + 1);
+          p.build = Math.min(buildCap(p), p.build + 1);
           floatText(p.x, p.y - 34, 'Ammo + barricade', '#f2d27a');
         } else {
-          p.hp = Math.min(100, p.hp + 30);
+          p.hp = Math.min(maxHp(p), p.hp + 30);
           floatText(p.x, p.y - 34, '+30 health', '#8fd67a');
         }
       }
@@ -724,6 +914,14 @@ function update(dt) {
     for (const l of loot) {
       if (l.taken || dist(p, l) > 28) continue;
       l.taken = true;
+      if (l.item.kind === 'mod') {
+        const sl = p.slots[p.cur], M = MODS[l.item.id];
+        const old = sl.mod ? ` (replaced ${MODS[sl.mod].name})` : '';
+        sl.mod = l.item.id;
+        banner(`${p.name} fitted ${M.name} to ${sl.name}${old}`, M.color);
+        burst(l.x, l.y, M.color, 24, 200, 5);
+        continue;
+      }
       const same = p.slots.find(s => s.id === l.item.id && s.rarity === l.item.rarity);
       if (same) { same.ammo = same.max; floatText(p.x, p.y - 34, same.name + ' refilled', RARITY_COLOR[same.rarity]); }
       else {
@@ -754,9 +952,14 @@ function update(dt) {
     const tdx = (t.x - z.x) / (bd || 1), tdy = (t.y - z.y) / (bd || 1);
     let [fx, fy] = flowDir(z, t);
     let sp = z.speed;
+    if (z.slow > 0) { z.slow -= dt; sp *= z.boss ? .75 : .5; }
 
     if (z.ranged && bd < 340) sp *= .35;
-    if (z.necro && bd < 320) { fx = -tdx; fy = -tdy; sp *= .6; }
+    if (z.necro && z.inside && bd < 320) { fx = -tdx; fy = -tdy; sp *= .6; }
+    if (!z.inside) {
+      z.outT = (z.outT || 0) + dt;
+      if (z.outT > 10) { z.x = clamp(z.x, z.r + 40, WW - z.r - 40); z.y = clamp(z.y, z.r + 40, WH - z.r - 40); z.inside = true; }
+    }
     if (z.dash) {
       z.dcd -= dt;
       if (z.dashT > 0) { z.dashT -= dt; fx = z.ddx; fy = z.ddy; sp = 430; }
@@ -824,7 +1027,7 @@ function update(dt) {
     if (z.ranged && z.inside) {
       z.shoot -= dt;
       if (z.shoot <= 0 && bd < 450) {
-        z.shoot = rand(2, 3.2);
+        z.shoot = rand(2, 3.2) * (activeMods.has('bloodmoon') ? .6 : 1);
         eShot(z.x, z.y - 6, Math.atan2(tdy, tdx), z.ranged === 'acid' ? 230 : 260, z.ranged);
       }
     }
@@ -882,7 +1085,17 @@ function update(dt) {
       particles.push({ x: b.x, y: b.y, vx: rand(-30, 30), vy: rand(-30, 30), life: .3, max: .3, size: 4, color: b.color });
 
     const end = () => { b.dead = true; if (b.blast) explode(b.x, b.y, b.blast, b.blastDmg, b.owner, b.slot); };
-    if (b.x < 0 || b.x > WW || b.y < 0 || b.y > WH || isBlockedAt(b.x, b.y)) {
+    if (isBlockedAt(b.x, b.y)) {
+      if (b.mod === 'ricochet' && b.bounces < 2) {
+        const px = b.x - b.vx * dt, py = b.y - b.vy * dt;
+        const hx = isBlockedAt(b.x, py), hy = isBlockedAt(px, b.y);
+        if (hx) b.vx = -b.vx;
+        if (hy) b.vy = -b.vy;
+        if (!hx && !hy) { b.vx = -b.vx; b.vy = -b.vy; }
+        b.x = px; b.y = py; b.bounces++; b.life += .25; b.hit.clear();
+        burst(b.x, b.y, '#e6dfc8', 2, 80, 2);
+        continue;
+      }
       if (b.kind === 'bullet') burst(b.x, b.y, '#d8d0b0', 3, 90, 2);
       end(); continue;
     }
@@ -922,9 +1135,37 @@ function update(dt) {
   pickups = pickups.filter(k => (k.life -= dt) > 0);
   puddles = puddles.filter(q => (q.life -= dt) > 0);
 
+  // airstrike + medkits
+  for (const st of strikes) {
+    st.t -= dt;
+    if (st.t <= 0) { explode(st.x, st.y, 110, 170, st.owner, null); st.done = true; }
+  }
+  strikes = strikes.filter(st => !st.done);
+  for (const m of meds) {
+    m.t += dt;
+    const k = Math.min(1, m.t / m.dur);
+    m.x = m.sx + (m.to.x - m.sx) * k; m.y = m.sy + (m.to.y - m.sy) * k - Math.sin(k * Math.PI) * 60;
+    if (k >= 1) {
+      m.done = true;
+      const heal = 35 + 10 * m.from.up.medic;
+      if (!m.to.alive) {
+        m.to.alive = true; m.to.hp = heal; m.to.rev = 0; m.to.hurt = 1;
+        banner(`${m.from.name} revived ${m.to.name} with a medkit`, '#8fd67a');
+      } else {
+        m.to.hp = Math.min(maxHp(m.to), m.to.hp + heal);
+        floatText(m.to.x, m.to.y - 34, '+' + heal + ' health', '#8fd67a');
+      }
+      burst(m.to.x, m.to.y, '#8fd67a', 14, 140, 5);
+    }
+  }
+  meds = meds.filter(m => !m.done);
+
   // waves
   if (state === 'play') {
-    if (intermission > 0) {
+    if (clearT > 0) {
+      clearT -= dt;
+      if (clearT <= 0) openShop();
+    } else if (intermission > 0) {
       intermission -= dt;
       if (intermission <= 0) nextWave();
     } else {
@@ -936,8 +1177,9 @@ function update(dt) {
           spawnT = Math.max(.2, 1 - wave * .05) * rand(.5, 1.3);
         }
       } else if (!bossPending && zombies.length === 0) {
-        intermission = wave % BOSS_EVERY === 0 ? 8 : 4;
-        banner('Wave ' + wave + ' cleared', '#8fd67a');
+        clearT = wave % BOSS_EVERY === 0 ? 6 : 2.5;
+        activeMods.clear();
+        banner('Wave ' + wave + ' cleared. Shop opens shortly', '#8fd67a');
       }
     }
   }
@@ -1030,6 +1272,10 @@ function drawPlayer(p) {
 }
 
 function drawZombie(z) {
+  if (z.elite) {
+    ctx.fillStyle = `rgba(242,210,122,${.18 + .1 * Math.sin(time * 6)})`;
+    ctx.beginPath(); ctx.arc(z.x, z.y - z.r * .4, z.r * 2.1, 0, 6.283); ctx.fill();
+  }
   if (z.blinkT > 0) {
     ctx.strokeStyle = `rgba(154,215,255,${.4 + .4 * Math.sin(time * 30)})`; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(z.bx, z.by, z.r + 10, 0, 6.283); ctx.stroke();
@@ -1053,6 +1299,7 @@ function drawZombie(z) {
     ctx.fillStyle = 'rgba(182,224,74,.5)';
     ctx.beginPath(); ctx.arc(z.x, z.y - z.r * .2, z.r * .55 + Math.sin(time * 6 + z.wob) * 2, 0, 6.283); ctx.fill();
   }
+  if (z.slow > 0) { ctx.fillStyle = 'rgba(143,216,255,.3)'; ctx.fillRect(z.x - z.r, z.y - z.r * 1.7, z.r * 2, z.r * 2.5); }
   if (z.burn > 0) { ctx.fillStyle = 'rgba(255,120,40,.25)'; ctx.fillRect(z.x - z.r, z.y - z.r * 1.7, z.r * 2, z.r * 2.5); }
   if (!z.boss && z.hp < z.max) {
     ctx.fillStyle = '#000'; ctx.fillRect(z.x - z.r, z.y - z.r * 2.1, z.r * 2, 4);
@@ -1061,7 +1308,8 @@ function drawZombie(z) {
 }
 
 function drawLoot(l) {
-  const col = RARITY_COLOR[l.item.rarity];
+  const isMod = l.item.kind === 'mod';
+  const col = isMod ? MODS[l.item.id].color : RARITY_COLOR[l.item.rarity];
   const bob = Math.sin(time * 3 + l.bob) * 3;
   const grad = ctx.createLinearGradient(0, l.y - 160, 0, l.y);
   grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, col + '88');
@@ -1070,13 +1318,19 @@ function drawLoot(l) {
   ctx.fillStyle = col; ctx.fillRect(-10, -10, 20, 20);
   ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(-10, -10, 20, 20);
   ctx.restore();
-  const def = l.item.rarity === 'legendary' ? LEGENDARY[l.item.id] : W_DEFS[l.item.id];
-  const name = (l.item.rarity === 'rare' ? 'Prime ' : '') + def.name;
+  let name, tag;
+  if (isMod) { name = MODS[l.item.id].name + ' mod'; tag = MODS[l.item.id].desc; }
+  else {
+    const def = l.item.rarity === 'legendary' ? LEGENDARY[l.item.id] : W_DEFS[l.item.id];
+    name = (l.item.rarity === 'rare' ? 'Prime ' : '') + def.name;
+    tag = l.item.rarity === 'legendary' ? 'Legendary' : 'Rare';
+  }
   ctx.font = `bold 14px ${FONT}`; ctx.textAlign = 'center';
   ctx.fillStyle = '#000'; ctx.fillText(name, l.x + 1, l.y - 29);
   ctx.fillStyle = col; ctx.fillText(name, l.x, l.y - 30);
   ctx.font = `11px ${FONT}`; ctx.fillStyle = '#e6dfc8';
-  ctx.fillText(l.item.rarity === 'legendary' ? 'Legendary' : 'Rare', l.x, l.y - 44);
+  ctx.fillText(tag, l.x, l.y - 44);
+  if (isMod) ctx.fillText('Attaches to the weapon you are holding', l.x, l.y - 58);
 }
 
 function drawWorld() {
@@ -1128,6 +1382,13 @@ function drawWorld() {
     else { ctx.fillRect(k.x - 7, k.y - 2 + bobY, 14, 4); ctx.fillRect(k.x - 2, k.y - 7 + bobY, 4, 14); }
   }
   for (const l of loot) drawLoot(l);
+  for (const st of strikes) {
+    const k = 1 - st.t / st.max;
+    ctx.strokeStyle = `rgba(255,80,50,${.4 + .5 * k})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(st.x, st.y, 110 * (1 - k * .6), 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(st.x - 12, st.y); ctx.lineTo(st.x + 12, st.y);
+    ctx.moveTo(st.x, st.y - 12); ctx.lineTo(st.x, st.y + 12); ctx.stroke();
+  }
 
   const actors = [];
   for (const p of players) actors.push({ y: p.alive ? p.y : p.y - 100, d: () => drawPlayer(p) });
@@ -1194,7 +1455,31 @@ function drawWorld() {
     ctx.fillStyle = t.color; ctx.fillText(t.t, t.x, t.y);
   }
   ctx.globalAlpha = 1;
+  for (const m of meds) {
+    ctx.fillStyle = '#e6dfc8'; ctx.fillRect(m.x - 9, m.y - 9, 18, 18);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(m.x - 9, m.y - 9, 18, 18);
+    ctx.fillStyle = '#c8322a'; ctx.fillRect(m.x - 6, m.y - 2, 12, 4); ctx.fillRect(m.x - 2, m.y - 6, 4, 12);
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (activeMods.has('fog') && state !== 'title') drawFog();
+}
+
+const fogC = document.createElement('canvas'); fogC.width = W; fogC.height = H;
+const fg = fogC.getContext('2d');
+function drawFog() {
+  fg.globalCompositeOperation = 'source-over';
+  fg.clearRect(0, 0, W, H);
+  fg.fillStyle = 'rgba(8,8,12,.93)'; fg.fillRect(0, 0, W, H);
+  fg.globalCompositeOperation = 'destination-out';
+  for (const p of players) {
+    const sx = W / 2 + (p.x - camX) * zoom, sy = AY + (H - AY) / 2 + (p.y - camY) * zoom, r = 300 * zoom;
+    const gr = fg.createRadialGradient(sx, sy, r * .35, sx, sy, r);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    fg.fillStyle = gr;
+    fg.beginPath(); fg.arc(sx, sy, r, 0, 6.283); fg.fill();
+  }
+  fg.globalCompositeOperation = 'source-over';
+  ctx.drawImage(fogC, 0, 0);
 }
 
 function pips(x, y, lv, align) {
@@ -1217,26 +1502,29 @@ function drawHud() {
     ctx.fillText(p.name, x0, 20);
     const bx = left ? x0 + 32 : x0 - 32 - 150;
     ctx.fillStyle = '#2e2c24'; ctx.fillRect(bx, 8, 150, 13);
-    const fw = 150 * p.hp / 100;
-    ctx.fillStyle = p.hp > 35 ? '#6bbf4a' : '#d0402f';
+    const fw = 150 * clamp(p.hp / maxHp(p), 0, 1);
+    ctx.fillStyle = p.hp > maxHp(p) * .35 ? '#6bbf4a' : '#d0402f';
     ctx.fillRect(left ? bx : bx + 150 - fw, 8, fw, 13);
     ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(bx, 8, 150, 13);
     ctx.font = `bold 15px ${FONT}`;
     ctx.fillStyle = p.combo > 1 ? '#f2d27a' : '#e6dfc8';
-    ctx.fillText(p.score + (p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''), left ? bx + 162 : bx - 12, 20);
+    ctx.fillText(`${p.score}${p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''}`, left ? bx + 162 : bx - 12, 20);
+    ctx.font = `bold 14px ${FONT}`; ctx.fillStyle = '#8fd67a';
+    const scoreW = ctx.measureText(`${p.score}${p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''}`).width + 16;
+    ctx.fillText('$' + p.cash, left ? bx + 162 + scoreW : bx - 12 - scoreW, 20);
 
     const s = p.slots[p.cur];
     const am = s.ammo === Infinity ? '∞' : s.ammo;
     const lv = s.base ? mastery[s.base].lv : 0;
     ctx.font = `bold 14px ${FONT}`;
-    const nameTxt = `${s.name} ${am}`;
-    const tail = `   Barricades ${p.build}   ${p.cur + 1}/${p.slots.length}`;
+    const nameTxt = `${s.name}${s.mod ? ' + ' + MODS[s.mod].name : ''} ${am}`;
+    const tail = `   Barricades ${p.build}/${buildCap(p)}   Medkit ${p.medCd > 0 ? Math.ceil(p.medCd) + 's' : 'ready'}`;
     ctx.font = `13px ${FONT}`; const tailW = ctx.measureText(tail).width;
     ctx.font = `bold 14px ${FONT}`; const nameW = ctx.measureText(nameTxt).width;
     const pw = s.base ? 45 : 0;
     let cx = left ? x0 : x0 - (nameW + pw + tailW);
     ctx.textAlign = 'left';
-    ctx.fillStyle = RARITY_COLOR[s.rarity]; ctx.fillText(nameTxt, cx, 42); cx += nameW + 6;
+    ctx.fillStyle = s.mod ? MODS[s.mod].color : RARITY_COLOR[s.rarity]; ctx.fillText(nameTxt, cx, 42); cx += nameW + 6;
     if (s.base) { pips(cx, 42, lv, 'left'); cx += 39; }
     ctx.font = `13px ${FONT}`; ctx.fillStyle = '#8f8870'; ctx.fillText(tail, cx, 42);
   }
@@ -1244,7 +1532,7 @@ function drawHud() {
   ctx.font = `bold 18px ${FONT}`; ctx.fillStyle = '#e6dfc8';
   ctx.fillText('Wave ' + wave + (wave % BOSS_EVERY === 0 ? ' (boss)' : ''), W / 2, 21);
   ctx.font = `13px ${FONT}`; ctx.fillStyle = '#8f8870';
-  ctx.fillText(intermission > 0 ? 'Next wave in ' + Math.ceil(intermission) : (zombies.length + toSpawn) + ' enemies left', W / 2, 42);
+  ctx.fillText(clearT > 0 ? 'Wave cleared' : intermission > 0 ? 'Next wave in ' + Math.ceil(intermission) : (zombies.length + toSpawn) + ' enemies left', W / 2, 42);
 
   let y = AY + 8;
   for (const p of players) {
@@ -1265,7 +1553,24 @@ function drawHud() {
     ctx.textAlign = 'right'; ctx.fillStyle = '#e6dfc8'; ctx.font = `12px ${FONT}`;
     ctx.fillText(`${c}/${need}`, bx + 242, AY + 25);
   }
-  y += 34;
+  {
+    const pw = 380, px = W / 2 - pw / 2, full = teamEnergy >= ENERGY_MAX;
+    const modTxt = [...activeMods].map(m => MODIFIERS[m].name).join('  ·  ');
+    const ph = modTxt ? 46 : 26;
+    ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(px, AY + 8, pw, ph);
+    ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`;
+    ctx.fillStyle = full ? (Math.floor(time * 4) % 2 ? '#ff9a3c' : '#ffd27a') : '#8f8870';
+    ctx.fillText(full ? "Airstrike ready: P1 G + P2 ' together" : 'Airstrike', px + 10, AY + 25);
+    if (!full) {
+      ctx.fillStyle = '#3a372c'; ctx.fillRect(px + 90, AY + 16, 270, 10);
+      ctx.fillStyle = '#ff9a3c'; ctx.fillRect(px + 90, AY + 16, 270 * teamEnergy / ENERGY_MAX, 10);
+    }
+    if (modTxt) {
+      ctx.textAlign = 'center'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = '#c9a0ff';
+      ctx.fillText(modTxt, W / 2, AY + 45);
+    }
+    y = AY + 8 + Math.max(34, ph + 6);
+  }
   const boss = zombies.find(z => z.boss);
   if (boss) {
     ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(W / 2 - 260, y, 520, 36);
@@ -1307,6 +1612,7 @@ function drawHud() {
   ctx.strokeStyle = 'rgba(230,223,200,.5)'; ctx.lineWidth = 1;
   ctx.strokeRect(mx + (camX - W / 2 / zoom) * MMS, my + (camY - (H - AY) / 2 / zoom) * MMS, W / zoom * MMS, (H - AY) / zoom * MMS);
   for (const z of zombies) {
+    if (activeMods.has('fog') && !z.boss && zombies.length + toSpawn > 5) continue;
     ctx.fillStyle = z.boss ? '#ff4a3a' : '#b8322a';
     const s = z.boss ? 6 : 2;
     ctx.fillRect(mx + z.x * MMS - s / 2, my + z.y * MMS - s / 2, s, s);
@@ -1323,6 +1629,74 @@ function drawHud() {
 
 function shade(a) { ctx.fillStyle = `rgba(10,9,6,${a})`; ctx.fillRect(0, 0, W, H); }
 
+function drawShop() {
+  shade(.82);
+  ctx.textAlign = 'center';
+  ctx.font = `56px ${DISPLAY}`; ctx.fillStyle = '#e6dfc8';
+  ctx.fillText('Supply stop', W / 2, 78);
+  const upcoming = wave + 1;
+  ctx.font = `bold 17px ${FONT}`;
+  if (upcoming % BOSS_EVERY === 0) {
+    ctx.fillStyle = '#e2735f';
+    ctx.fillText(`Next: wave ${upcoming}, ${BOSSES[(upcoming / BOSS_EVERY - 1) % BOSSES.length].name}`, W / 2, 108);
+  } else {
+    ctx.fillStyle = '#e6dfc8';
+    ctx.fillText(`Next: wave ${upcoming}`, W / 2, 108);
+  }
+  ctx.font = `14px ${FONT}`;
+  if (nextMods.length) nextMods.forEach((m, i) => {
+    ctx.fillStyle = '#c9a0ff';
+    ctx.fillText(`${MODIFIERS[m].name}: ${MODIFIERS[m].desc}`, W / 2, 132 + i * 20);
+  });
+  else { ctx.fillStyle = '#8f8870'; ctx.fillText('No wave modifiers', W / 2, 132); }
+
+  const hints = ['W / S to choose, Space to buy, E when ready', 'Up / Down to choose, Enter to buy, / when ready'];
+  for (const p of players) {
+    const colW = 520, x0 = p.i === 0 ? 50 : W - 50 - colW, y0 = 180;
+    ctx.fillStyle = 'rgba(30,28,20,.95)'; ctx.fillRect(x0, y0, colW, 540);
+    ctx.strokeStyle = p.ready ? '#8fd67a' : p.head; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, colW, 540);
+    ctx.textAlign = 'left'; ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = p.head;
+    ctx.fillText(p.name, x0 + 18, y0 + 34);
+    ctx.fillStyle = '#8fd67a'; ctx.fillText('$' + p.cash, x0 + 70, y0 + 34);
+    ctx.textAlign = 'right'; ctx.font = `14px ${FONT}`; ctx.fillStyle = '#a9a28a';
+    ctx.fillText(`Health ${Math.ceil(p.hp)}/${maxHp(p)}`, x0 + colW - 18, y0 + 32);
+
+    SHOP.forEach((it, i) => {
+      const ry = y0 + 52 + i * 38, sel = i === p.sel && !p.ready;
+      if (sel) { ctx.fillStyle = 'rgba(230,223,200,.1)'; ctx.fillRect(x0 + 8, ry, colW - 16, 34); ctx.fillStyle = p.head; ctx.fillRect(x0 + 8, ry, 4, 34); }
+      ctx.textAlign = 'left'; ctx.font = `bold 16px ${FONT}`;
+      const lv = p.up[it.id] || 0;
+      const maxed = !it.repeat && it.id !== 'ready' && lv >= it.max;
+      const cost = it.id === 'ready' ? null : it.cost(lv);
+      ctx.fillStyle = it.id === 'ready' ? '#8fd67a' : maxed ? '#6b665a' : (cost > p.cash ? '#a9a28a' : '#e6dfc8');
+      ctx.fillText(it.name, x0 + 22, ry + 22);
+      if (it.max) {
+        for (let k = 0; k < it.max; k++) {
+          ctx.fillStyle = k < lv ? p.head : '#3a372c';
+          ctx.fillRect(x0 + 250 + k * 16, ry + 12, 12, 10);
+        }
+      }
+      ctx.textAlign = 'right';
+      if (it.id !== 'ready') {
+        ctx.fillStyle = maxed ? '#6b665a' : cost > p.cash ? '#c0574a' : '#8fd67a';
+        ctx.fillText(maxed ? 'Maxed' : '$' + cost, x0 + colW - 22, ry + 22);
+      }
+    });
+    const sel = SHOP[p.sel];
+    ctx.textAlign = 'left'; ctx.font = `14px ${FONT}`; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText(p.ready ? 'Ready. Press fire or build to go back to shopping.' : sel.desc, x0 + 18, y0 + 452);
+    ctx.fillStyle = p.msgT > 0 ? '#f2d27a' : '#8f8870';
+    ctx.fillText(p.msgT > 0 ? p.msg : hints[p.i], x0 + 18, y0 + 476);
+    const s2 = p.slots.filter(sl => sl.mod).map(sl => `${sl.name}: ${MODS[sl.mod].name}`).join(',  ');
+    ctx.fillStyle = '#a9a28a'; ctx.font = `12px ${FONT}`;
+    ctx.fillText(s2 ? 'Mods: ' + s2 : 'No weapon mods yet. Elites and bosses drop them', x0 + 18, y0 + 504, colW - 36);
+    if (p.ready) {
+      ctx.textAlign = 'center'; ctx.font = `48px ${DISPLAY}`; ctx.fillStyle = 'rgba(143,214,122,.9)';
+      ctx.fillText('READY', x0 + colW / 2, y0 + 260);
+    }
+  }
+}
+
 function drawTitle() {
   camX = WW / 2; camY = WH / 2; zoom = ZMIN;
   drawWorld(); shade(.74);
@@ -1334,12 +1708,13 @@ function drawTitle() {
   ctx.fillText('Two players, one keyboard, too many zombies.', W / 2, 192);
 
   const rows = [['Move', 'W A S D', 'Arrow keys'], ['Shoot', 'Space', 'Enter'],
-                ['Switch weapon', 'Q', 'Right Shift'], ['Place barricade', 'E', '/']];
+                ['Switch weapon', 'Q', 'Right Shift'], ['Place barricade', 'E', '/'],
+                ['Throw medkit', 'F', ';'], ['Airstrike (together)', 'G', "'"]];
   ctx.font = `bold 19px ${FONT}`;
   ctx.fillStyle = '#f2b134'; ctx.fillText('Player 1', W / 2 - 60, 250);
   ctx.fillStyle = '#5fc6d6'; ctx.fillText('Player 2', W / 2 + 160, 250);
   rows.forEach((r, i) => {
-    const yy = 284 + i * 32;
+    const yy = 276 + i * 28;
     ctx.textAlign = 'right'; ctx.font = `17px ${FONT}`; ctx.fillStyle = '#8f8870';
     ctx.fillText(r[0], W / 2 - 160, yy);
     ctx.textAlign = 'center'; ctx.fillStyle = '#e6dfc8'; ctx.font = `bold 17px ${FONT}`;
@@ -1347,15 +1722,16 @@ function drawTitle() {
   });
   const lines = [
     'You aim where you walk. Shoot red barrels. Stand next to a downed partner for 3 seconds to revive them.',
-    'Chain kills with a weapon to master it. When either of you masters one, you both get the upgrade.',
+    'Kills build both players\' combos. Chain kills with a weapon to master it for the whole team.',
+    'Spend cash in the shop between waves. Watch for wave modifiers and elites carrying weapon mods.',
     `Every ${BOSS_EVERY}th wave brings a boss that drops rare and legendary weapons. Each drop goes to whoever grabs it.`,
     'New weapons unlock as the waves go on.' + (best ? `   Best: wave ${best}` : '')
   ];
   ctx.font = `15px ${FONT}`; ctx.fillStyle = '#a9a28a';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, 454 + i * 24));
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, 470 + i * 24));
   if (Math.floor(performance.now() / 500) % 2 === 0) {
     ctx.font = `bold 26px ${FONT}`; ctx.fillStyle = '#e6dfc8';
-    ctx.fillText('Press Space or Enter to start', W / 2, 640);
+    ctx.fillText('Press Space or Enter to start', W / 2, 670);
   }
 }
 
@@ -1364,6 +1740,7 @@ function draw() {
   ctx.fillStyle = '#16140f'; ctx.fillRect(0, 0, W, H);
   if (state === 'title') { drawTitle(); return; }
   drawWorld();
+  if (state === 'shop') { drawShop(); return; }
   drawHud();
   ctx.textAlign = 'center';
   if (state === 'paused') {
@@ -1394,8 +1771,10 @@ function loop(now) {
     if (tap(['Space', 'Enter', 'NumpadEnter'])) startGame();
   } else if (state === 'play') {
     if (tap(['KeyP', 'Escape'])) state = 'paused';
-    else if (tap(['KeyR'])) startGame();
     else update(dt);
+  } else if (state === 'shop') {
+    shopInput(dt);
+    updateFx(dt);
   } else if (state === 'paused') {
     if (tap(['KeyP', 'Escape'])) state = 'play';
     else if (tap(['KeyR'])) startGame();
