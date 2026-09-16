@@ -54,9 +54,10 @@ const LEGENDARY = {
 const RARITY_COLOR = { base:'#e6dfc8', rare:'#5aa9ff', legendary:'#ff9f1a' };
 
 /* ---------------- CONFIG: team mastery ---------------- */
-// Kills count toward a weapon's mastery only while BOTH players are alive and
-// holding that same weapon (a Prime version counts as the same weapon).
-// Kills must keep coming within CHAIN_WINDOW seconds or the chain resets.
+// Each player builds their own kill chain per weapon (a Prime version counts as
+// the same weapon). Kills must keep coming within CHAIN_WINDOW seconds or that
+// player's chain resets. When either player's chain hits the threshold, the
+// weapon levels up for the whole team and both players' chains restart.
 const MASTERY_NEED = [12, 25, 40];
 const CHAIN_WINDOW = 3;
 const MASTERY_PERKS = [
@@ -245,7 +246,7 @@ try { best = +localStorage.getItem('blockrot-best') || 0; } catch (e) {}
 function newPlayer(i) {
   return { i, x: i ? 1280 : 1120, y: 1100, r: 14, hp: 100, dx: 0, dy: -1, speed: 200,
     slots: [], cur: 0, cd: 0, alive: true, build: 2, score: 0, combo: 0, comboT: 0,
-    hurt: 0, rev: 0, walk: 0,
+    hurt: 0, rev: 0, walk: 0, chain: {}, chainT: {},
     body: i ? '#2f8fa0' : '#c98a1e', head: i ? '#5fc6d6' : '#f2b134', name: i ? 'P2' : 'P1' };
 }
 
@@ -284,7 +285,7 @@ function burst(x, y, color, n, spd = 160, size = 4) {
 function startGame() {
   state = 'play'; wave = 0; time = 0;
   mastery = {};
-  for (const id in W_DEFS) mastery[id] = { lv: 0, chain: 0, t: 0 };
+  for (const id in W_DEFS) mastery[id] = { lv: 0 };
   players = [newPlayer(0), newPlayer(1)];
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
@@ -538,13 +539,6 @@ function hurtDot(p, d) {
 }
 
 /* ---------------- damage, kills, mastery ---------------- */
-function syncWeapon() {
-  const [a, b] = players;
-  if (!a.alive || !b.alive) return null;
-  const sa = a.slots[a.cur], sb = b.slots[b.cur];
-  return sa && sb && sa.base && sa.base === sb.base ? sa.base : null;
-}
-
 function damage(z, d, owner, slot, kx, ky, bypass) {
   if (z.dead) return;
   if (z.shield && !bypass) {
@@ -572,13 +566,15 @@ function kill(z, owner, slot) {
     const pts = z.pts * Math.min(owner.combo, 10);
     owner.score += pts;
     floatText(z.x, z.y - 24, '+' + pts, owner.head);
-    if (slot && slot.base && syncWeapon() === slot.base) {
-      const m = mastery[slot.base];
-      if (m.lv < 3) {
-        m.chain++; m.t = CHAIN_WINDOW;
-        if (m.chain >= MASTERY_NEED[m.lv]) {
-          m.lv++; m.chain = 0;
-          banner(`${W_DEFS[slot.base].name} mastery ${'I'.repeat(m.lv)}: ${MASTERY_PERKS[m.lv - 1]}`, '#f2d27a', true);
+    if (slot && slot.base && mastery[slot.base].lv < 3) {
+      const id = slot.base, m = mastery[id];
+      owner.chain[id] = (owner.chain[id] || 0) + 1;
+      owner.chainT[id] = CHAIN_WINDOW;
+      if (owner.chain[id] >= MASTERY_NEED[m.lv]) {
+        {
+          m.lv++;
+          for (const q of players) { q.chain[id] = 0; q.chainT[id] = 0; }
+          banner(`${owner.name} mastered the ${W_DEFS[id].name}! Team perk ${'I'.repeat(m.lv)}: ${MASTERY_PERKS[m.lv - 1]}`, '#f2d27a', true);
           for (const p of players) {
             burst(p.x, p.y, '#f2d27a', 20, 220, 5);
             for (const s of p.slots) if (s.base === slot.base) { const old = s.max; s.max = maxAmmo(s); if (s.max !== Infinity) s.ammo += s.max - old; }
@@ -679,9 +675,8 @@ function update(dt) {
   fieldT -= dt;
   if (fieldT <= 0) { computeField(); fieldT = .25; }
 
-  for (const id in mastery) {
-    const m = mastery[id];
-    if (m.t > 0) { m.t -= dt; if (m.t <= 0) m.chain = 0; }
+  for (const p of players) for (const id in p.chainT) {
+    if (p.chainT[id] > 0) { p.chainT[id] -= dt; if (p.chainT[id] <= 0) p.chain[id] = 0; }
   }
 
   // players
@@ -1252,22 +1247,25 @@ function drawHud() {
   ctx.fillText(intermission > 0 ? 'Next wave in ' + Math.ceil(intermission) : (zombies.length + toSpawn) + ' enemies left', W / 2, 42);
 
   let y = AY + 8;
-  const sid = syncWeapon();
-  if (sid) {
-    const m = mastery[sid];
-    ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(W / 2 - 170, y, 340, 28);
-    ctx.textAlign = 'left'; ctx.font = `bold 13px ${FONT}`; ctx.fillStyle = '#f2d27a';
-    const label = m.lv >= 3 ? `${W_DEFS[sid].name} fully mastered` : `Synced: ${W_DEFS[sid].name} mastery`;
-    ctx.fillText(label, W / 2 - 160, y + 18);
-    if (m.lv < 3) {
-      const need = MASTERY_NEED[m.lv], bw = 110, bxx = W / 2 + 45;
-      ctx.fillStyle = '#3a372c'; ctx.fillRect(bxx, y + 9, bw, 10);
-      ctx.fillStyle = '#f2d27a'; ctx.fillRect(bxx, y + 9, bw * m.chain / need, 10);
-      ctx.textAlign = 'right'; ctx.fillStyle = '#e6dfc8'; ctx.font = `12px ${FONT}`;
-      ctx.fillText(`${m.chain}/${need}`, W / 2 + 162, y + 18);
-    }
-    y += 34;
+  for (const p of players) {
+    const sl = p.slots[p.cur];
+    if (!p.alive || !sl.base) continue;
+    const id = sl.base, m = mastery[id], left = p.i === 0;
+    const bx = left ? 10 : W - 260;
+    ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(bx, AY + 8, 250, 26);
+    ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = p.head;
+    if (m.lv >= 3) { ctx.fillText(`${W_DEFS[id].name} fully mastered`, bx + 10, AY + 25); continue; }
+    const need = MASTERY_NEED[m.lv], c = p.chain[id] || 0;
+    ctx.fillText(`${W_DEFS[id].name} chain`, bx + 10, AY + 25);
+    const barX = bx + 120, barW = 80;
+    ctx.fillStyle = '#3a372c'; ctx.fillRect(barX, AY + 16, barW, 10);
+    const tFrac = Math.max(0, (p.chainT[id] || 0) / CHAIN_WINDOW);
+    ctx.fillStyle = '#f2d27a'; ctx.fillRect(barX, AY + 16, barW * c / need, 10);
+    ctx.fillStyle = 'rgba(242,210,122,.45)'; ctx.fillRect(barX, AY + 28, barW * tFrac, 2);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#e6dfc8'; ctx.font = `12px ${FONT}`;
+    ctx.fillText(`${c}/${need}`, bx + 242, AY + 25);
   }
+  y += 34;
   const boss = zombies.find(z => z.boss);
   if (boss) {
     ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(W / 2 - 260, y, 520, 36);
@@ -1349,7 +1347,7 @@ function drawTitle() {
   });
   const lines = [
     'You aim where you walk. Shoot red barrels. Stand next to a downed partner for 3 seconds to revive them.',
-    'Hold the same weapon as your partner and chain kills together to earn team mastery for it.',
+    'Chain kills with a weapon to master it. When either of you masters one, you both get the upgrade.',
     `Every ${BOSS_EVERY}th wave brings a boss that drops rare and legendary weapons. Each drop goes to whoever grabs it.`,
     'New weapons unlock as the waves go on.' + (best ? `   Best: wave ${best}` : '')
   ];
