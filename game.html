@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blockrot: two-player zombie survival</title>
+<style>
+  :root { --bg:#16140f; --ink:#e6dfc8; --muted:#8f8870; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:var(--bg); color:var(--ink);
+    font-family:"Trebuchet MS", "Segoe UI", sans-serif; overflow:hidden; }
+  #wrap { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
+  canvas { display:block; border:3px solid #000; outline:2px solid #3a362a; image-rendering:pixelated; }
+  #bar { font-size:13px; color:var(--muted); display:flex; gap:18px; }
+  #bar a { color:var(--ink); }
+  #bar a:focus-visible { outline:2px solid #f2b134; outline-offset:2px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="960" height="640" tabindex="0" aria-label="Blockrot game"></canvas>
+  <div id="bar"><a href="index.html">Back to study files</a><span>P pause · R restart</span></div>
+</div>
+<script>
+"use strict";
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const W = 960, H = 640, AY = 40, CELL = 32;
+
+function fit() {
+  const s = Math.min((innerWidth - 16) / W, (innerHeight - 40) / H);
+  cv.style.width = (W * s) + 'px'; cv.style.height = (H * s) + 'px';
+}
+addEventListener('resize', fit); fit();
+
+/* ---------- input ---------- */
+const keys = {}, pressed = {};
+const CTRL = [
+  { up:['KeyW'], down:['KeyS'], left:['KeyA'], right:['KeyD'],
+    fire:['Space'], swap:['KeyQ'], build:['KeyE'] },
+  { up:['ArrowUp'], down:['ArrowDown'], left:['ArrowLeft'], right:['ArrowRight'],
+    fire:['Enter','NumpadEnter','Numpad0'], swap:['ShiftRight','Period'], build:['Slash','Numpad1'] }
+];
+const BLOCK = new Set(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Slash','Enter','Period','Quote']);
+addEventListener('keydown', e => {
+  if (BLOCK.has(e.code)) e.preventDefault();
+  if (!keys[e.code]) pressed[e.code] = true;
+  keys[e.code] = true;
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') state = 'paused'; });
+const held = l => l.some(k => keys[k]);
+const tap  = l => l.some(k => pressed[k]);
+
+/* ---------- helpers ---------- */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/* ---------- data ---------- */
+const WEAPONS = [
+  { name:'Pistol',  rate:0.28, dmg:25, speed:720, spread:0.03, pellets:1, ammo:Infinity, unlock:1 },
+  { name:'SMG',     rate:0.08, dmg:14, speed:780, spread:0.12, pellets:1, ammo:220, unlock:2 },
+  { name:'Shotgun', rate:0.70, dmg:18, speed:640, spread:0.30, pellets:7, ammo:40,  unlock:3 },
+  { name:'Rockets', rate:1.00, dmg:30, speed:430, spread:0,    pellets:1, ammo:12,  unlock:5, blast:95, blastDmg:130 }
+];
+const ZT = {
+  walker:{ hp:50,  speed:[55,75],   r:13, dmg:10, body:'#5f8a45', head:'#86b066', pts:10 },
+  runner:{ hp:30,  speed:[125,145], r:11, dmg:8,  body:'#8d9a45', head:'#b9c46a', pts:15 },
+  imp:   { hp:90,  speed:[45,60],   r:14, dmg:12, body:'#9b2f22', head:'#d4533c', pts:25, shoots:true },
+  brute: { hp:420, speed:[34,44],   r:22, dmg:25, body:'#3f5c33', head:'#5f7f4c', pts:60 }
+};
+const OBST = [
+  {x:176,y:144,w:96,h:32}, {x:688,y:144,w:96,h:32},
+  {x:176,y:528,w:96,h:32}, {x:688,y:528,w:96,h:32},
+  {x:416,y:288,w:32,h:96}, {x:512,y:288,w:32,h:96},
+  {x:128,y:224,w:32,h:64}, {x:800,y:224,w:32,h:64},
+  {x:128,y:416,w:32,h:64}, {x:800,y:416,w:32,h:64}
+];
+const GATES = [
+  {x:W/2, y:AY-26, jx:1}, {x:W/2, y:H+26, jx:1},
+  {x:-26, y:(AY+H)/2, jy:1}, {x:W+26, y:(AY+H)/2, jy:1}
+];
+const BARREL_SPOTS = [[300,250],[660,250],[300,430],[660,430]];
+
+/* ---------- ground (persistent decals) ---------- */
+const gnd = document.createElement('canvas'); gnd.width = W; gnd.height = H;
+const g = gnd.getContext('2d');
+function resetGround() {
+  g.fillStyle = '#2b2a22'; g.fillRect(0, 0, W, H);
+  for (let y = 0; y < H; y += CELL) for (let x = 0; x < W; x += CELL) {
+    const v = Math.random() * 9 | 0;
+    g.fillStyle = `rgb(${58+v},${57+v},${46+v})`;
+    g.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+  }
+  g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 1.5;
+  for (let i = 0; i < 45; i++) {
+    let x = rand(0, W), y = rand(AY, H);
+    g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 4; k++) { x += rand(-18, 18); y += rand(-18, 18); g.lineTo(x, y); }
+    g.stroke();
+  }
+  for (const gt of GATES) {
+    const horiz = gt.jx;
+    const cx = clamp(gt.x, 0, W), cy = clamp(gt.y, AY, H);
+    for (let k = -3; k < 3; k++) {
+      g.fillStyle = k % 2 ? '#c9a227' : '#1a1a14';
+      if (horiz) g.fillRect(cx + k * 16, cy === AY ? AY : H - 8, 16, 8);
+      else g.fillRect(cx === 0 ? 0 : W - 8, cy + k * 16, 8, 16);
+    }
+  }
+}
+function splat(x, y, size, color) {
+  g.fillStyle = color;
+  for (let i = 0; i < 7; i++) {
+    const s = rand(size * 0.2, size * 0.6);
+    g.fillRect(x + rand(-size, size) - s / 2, y + rand(-size, size) - s / 2, s, s);
+  }
+}
+
+/* ---------- state ---------- */
+let state = 'title', wave = 0, time = 0, shake = 0;
+let players = [], zombies = [], bullets = [], fireballs = [], barricades = [];
+let barrels = [], particles = [], pickups = [], texts = [], banners = [];
+let toSpawn = 0, spawnT = 0, intermission = 0;
+let best = 0;
+try { best = +localStorage.getItem('blockrot-best') || 0; } catch (e) {}
+
+function newPlayer(i) {
+  return { i, x: i ? 560 : 400, y: 470, r: 13, hp: 100, dx: 0, dy: -1, speed: 190,
+    w: 0, cd: 0, ammo: WEAPONS.map(w => w.ammo), alive: true, build: 2,
+    score: 0, combo: 0, comboT: 0, hurt: 0, rev: 0, walk: 0,
+    body: i ? '#2f8fa0' : '#c98a1e', head: i ? '#5fc6d6' : '#f2b134', name: i ? 'P2' : 'P1' };
+}
+const unlockedCount = () => WEAPONS.filter(w => w.unlock <= wave).length;
+
+function banner(text, color = '#e6dfc8') { banners.push({ text, color, life: 2.4 }); }
+function floatText(x, y, t, color = '#fff') { texts.push({ x, y, t, color, life: 0.9 }); }
+function burst(x, y, color, n, spd = 160, size = 4) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.283), s = rand(spd * 0.3, spd);
+    const life = rand(0.25, 0.6);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, size: rand(size * 0.5, size), color });
+  }
+}
+
+function startGame() {
+  state = 'play'; wave = 0; time = 0;
+  players = [newPlayer(0), newPlayer(1)];
+  zombies = []; bullets = []; fireballs = []; barricades = [];
+  particles = []; pickups = []; texts = []; banners = [];
+  resetGround(); nextWave();
+}
+
+function nextWave() {
+  wave++;
+  toSpawn = 6 + wave * 4; spawnT = 1.2; intermission = 0;
+  for (const p of players) {
+    if (!p.alive) { p.alive = true; p.hp = 50; p.hurt = 1; }
+    else p.hp = Math.min(100, p.hp + 25);
+    p.ammo = WEAPONS.map(w => w.ammo);
+    p.build = Math.min(6, p.build + 2);
+  }
+  barrels = BARREL_SPOTS.map(([x, y]) => ({ x, y, r: 13, alive: true }));
+  banner('Wave ' + wave);
+  const nw = WEAPONS.find(w => w.unlock === wave);
+  if (nw && wave > 1) banner('New weapon: ' + nw.name + '  (Q / Right Shift to switch)', '#f2d27a');
+}
+
+function spawnZombie() {
+  const gt = GATES[Math.random() * 4 | 0];
+  const r = Math.random();
+  let type = 'walker';
+  if (wave >= 6 && r < 0.08) type = 'brute';
+  else if (wave >= 4 && r < 0.26) type = 'imp';
+  else if (wave >= 3 && r < 0.46) type = 'runner';
+  const T = ZT[type], scale = 1 + (wave - 1) * 0.09;
+  zombies.push({
+    type, x: gt.x + (gt.jx ? rand(-40, 40) : 0), y: gt.y + (gt.jy ? rand(-40, 40) : 0),
+    r: T.r, hp: T.hp * scale, max: T.hp * scale, speed: rand(...T.speed) * (1 + wave * 0.015),
+    dmg: T.dmg, body: T.body, head: T.head, pts: T.pts, shoots: !!T.shoots,
+    atk: 0, shoot: rand(1.5, 3), inside: false, wob: rand(0, 6.28), flash: 0, dx: 0, dy: 1, walk: 0
+  });
+}
+
+/* ---------- physics ---------- */
+function pushOut(e, rx, ry, rw, rh) {
+  const cx = clamp(e.x, rx, rx + rw), cy = clamp(e.y, ry, ry + rh);
+  const dx = e.x - cx, dy = e.y - cy, d2 = dx * dx + dy * dy;
+  if (d2 >= e.r * e.r) return false;
+  if (d2 === 0) {
+    const l = e.x - rx, rr = rx + rw - e.x, t = e.y - ry, b = ry + rh - e.y, m = Math.min(l, rr, t, b);
+    if (m === l) e.x = rx - e.r; else if (m === rr) e.x = rx + rw + e.r;
+    else if (m === t) e.y = ry - e.r; else e.y = ry + rh + e.r;
+  } else {
+    const d = Math.sqrt(d2);
+    e.x = cx + dx / d * e.r; e.y = cy + dy / d * e.r;
+  }
+  return true;
+}
+function solid(e) {
+  let hitBar = null;
+  for (const o of OBST) pushOut(e, o.x, o.y, o.w, o.h);
+  for (const b of barricades) if (pushOut(e, b.x, b.y, CELL, CELL)) hitBar = b;
+  for (const b of barrels) {
+    if (!b.alive) continue;
+    const dx = e.x - b.x, dy = e.y - b.y, d = Math.hypot(dx, dy), m = e.r + b.r;
+    if (d < m && d > 0) { e.x = b.x + dx / d * m; e.y = b.y + dy / d * m; }
+  }
+  if (e.inside !== false) { e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, AY + e.r, H - e.r); }
+  return hitBar;
+}
+const inRect = (p, o) => p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h;
+
+/* ---------- actions ---------- */
+function fire(p) {
+  const w = WEAPONS[p.w];
+  if (p.ammo[p.w] <= 0) { p.w = 0; return; }
+  p.cd = w.rate;
+  if (w.ammo !== Infinity) p.ammo[p.w]--;
+  const a = Math.atan2(p.dy, p.dx);
+  for (let k = 0; k < w.pellets; k++) {
+    const aa = a + rand(-w.spread, w.spread);
+    bullets.push({ x: p.x + p.dx * 16, y: p.y - 4 + p.dy * 16,
+      vx: Math.cos(aa) * w.speed * rand(0.92, 1), vy: Math.sin(aa) * w.speed * rand(0.92, 1),
+      dmg: w.dmg, owner: p, life: 0.9, blast: w.blast || 0, blastDmg: w.blastDmg || 0 });
+  }
+  particles.push({ x: p.x + p.dx * 22, y: p.y - 4 + p.dy * 22, vx: 0, vy: 0, life: 0.05, max: 0.05, size: 9, color: '#ffe9a0' });
+  if (w.blast) shake = Math.max(shake, 3);
+  if (p.ammo[p.w] <= 0) { p.w = 0; floatText(p.x, p.y - 30, 'Out of ammo', '#f2d27a'); }
+}
+
+function build(p) {
+  if (p.build <= 0) return;
+  const tx = p.x + p.dx * 34, ty = p.y + p.dy * 34;
+  const gx = Math.floor(tx / CELL) * CELL, gy = Math.floor(ty / CELL) * CELL;
+  if (gx < 0 || gx + CELL > W || gy < AY || gy + CELL > H) return;
+  const overlaps = o => gx < o.x + o.w && gx + CELL > o.x && gy < o.y + o.h && gy + CELL > o.y;
+  if (OBST.some(overlaps)) return;
+  if (barricades.some(b => b.x === gx && b.y === gy)) return;
+  const touches = e => Math.hypot(e.x - clamp(e.x, gx, gx + CELL), e.y - clamp(e.y, gy, gy + CELL)) < e.r;
+  if (players.some(q => q.alive && touches(q)) || zombies.some(touches)) return;
+  if (barrels.some(b => b.alive && touches(b))) return;
+  barricades.push({ x: gx, y: gy, hp: 160, max: 160 });
+  p.build--;
+  burst(gx + 16, gy + 16, '#a07a45', 6, 80);
+}
+
+function hurt(p, d) {
+  if (!p.alive || p.hurt > 0) return;
+  p.hp -= d; p.hurt = 0.3; shake = Math.max(shake, 5);
+  burst(p.x, p.y, '#b8322a', 6);
+  if (p.hp <= 0) {
+    p.hp = 0; p.alive = false; p.rev = 0; p.combo = 0;
+    banner(p.name + ' is down. Stand next to them to revive', '#e2735f');
+    if (players.every(q => !q.alive)) gameOver();
+  }
+}
+
+function damage(z, d, owner, kx, ky) {
+  if (z.dead) return;
+  z.hp -= d; z.flash = 0.08;
+  const s = Math.hypot(kx, ky) || 1, push = z.type === 'brute' ? 1 : 4;
+  z.x += kx / s * push; z.y += ky / s * push;
+  burst(z.x, z.y, '#7a1f18', 3, 120, 3);
+  if (z.hp <= 0) kill(z, owner);
+}
+
+function kill(z, owner) {
+  z.dead = true;
+  if (owner) {
+    owner.combo++; owner.comboT = 2.2;
+    const pts = z.pts * Math.min(owner.combo, 10);
+    owner.score += pts;
+    floatText(z.x, z.y - 20, '+' + pts, owner.head);
+  }
+  splat(z.x, z.y, z.r, 'rgba(110,22,18,.55)');
+  burst(z.x, z.y, z.body, 10, 180, 5);
+  const r = Math.random();
+  if (r < 0.07) pickups.push({ x: z.x, y: z.y, type: 'ammo', life: 14 });
+  else if (r < 0.11) pickups.push({ x: z.x, y: z.y, type: 'med', life: 14 });
+}
+
+function explode(x, y, rad, dmg, owner) {
+  shake = Math.max(shake, 10);
+  burst(x, y, '#ffb347', 22, 260, 7);
+  burst(x, y, '#5a5448', 14, 120, 9);
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  g.beginPath(); g.arc(x, y, rad * 0.45, 0, 6.283); g.fill();
+  for (const z of zombies) {
+    const d = dist(z, { x, y });
+    if (d < rad + z.r) damage(z, dmg * (1 - 0.5 * Math.min(1, d / rad)), owner, z.x - x, z.y - y);
+  }
+  for (const b of barrels) if (b.alive && dist(b, { x, y }) < rad) blowBarrel(b, owner);
+}
+function blowBarrel(b, owner) {
+  if (!b.alive) return;
+  b.alive = false;
+  explode(b.x, b.y, 110, 150, owner);
+}
+
+function gameOver() {
+  state = 'over';
+  if (wave > best) { best = wave; try { localStorage.setItem('blockrot-best', best); } catch (e) {} }
+}
+
+/* ---------- update ---------- */
+function update(dt) {
+  time += dt;
+
+  for (const p of players) {
+    if (!p.alive) {
+      const mate = players[1 - p.i];
+      if (mate.alive && dist(p, mate) < 46) {
+        p.rev += dt;
+        if (p.rev >= 3) { p.alive = true; p.hp = 40; p.rev = 0; p.hurt = 1; banner(p.name + ' is back up', '#8fd67a'); }
+      } else p.rev = Math.max(0, p.rev - dt);
+      continue;
+    }
+    const c = CTRL[p.i];
+    let mx = (held(c.right) ? 1 : 0) - (held(c.left) ? 1 : 0);
+    let my = (held(c.down) ? 1 : 0) - (held(c.up) ? 1 : 0);
+    if (mx || my) {
+      const l = Math.hypot(mx, my); mx /= l; my /= l;
+      p.dx = mx; p.dy = my; p.walk += dt * 12;
+    }
+    p.x += mx * p.speed * dt; p.y += my * p.speed * dt;
+    solid(p);
+    if (tap(c.swap)) {
+      const n = unlockedCount();
+      do { p.w = (p.w + 1) % n; } while (p.ammo[p.w] <= 0);
+    }
+    p.cd -= dt;
+    if (held(c.fire) && p.cd <= 0) fire(p);
+    if (tap(c.build)) build(p);
+    if (p.comboT > 0) { p.comboT -= dt; if (p.comboT <= 0) p.combo = 0; }
+    if (p.hurt > 0) p.hurt -= dt;
+    for (const k of pickups) {
+      if (k.life > 0 && dist(p, k) < 24) {
+        k.life = 0;
+        if (k.type === 'ammo') {
+          p.ammo = p.ammo.map((a, i) => a === Infinity ? a : Math.min(WEAPONS[i].ammo, a + Math.ceil(WEAPONS[i].ammo / 2)));
+          p.build = Math.min(6, p.build + 1);
+          floatText(p.x, p.y - 30, 'Ammo + barricade', '#f2d27a');
+        } else {
+          p.hp = Math.min(100, p.hp + 30);
+          floatText(p.x, p.y - 30, '+30 health', '#8fd67a');
+        }
+      }
+    }
+  }
+
+  // zombies
+  for (const z of zombies) {
+    z.flash -= dt;
+    let t = null, bd = 1e9;
+    for (const p of players) if (p.alive) { const d = dist(z, p); if (d < bd) { bd = d; t = p; } }
+    if (!t) continue;
+    let dx = t.x - z.x, dy = t.y - z.y;
+    const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    const wob = Math.sin(time * 2 + z.wob) * 0.35;
+    let sp = z.speed;
+    if (z.shoots && bd < 360) sp *= 0.4;
+    z.x += (dx - dy * wob) * sp * dt; z.y += (dy + dx * wob) * sp * dt;
+    z.dx = dx; z.dy = dy; z.walk += dt * sp * 0.12;
+    if (!z.inside && z.x > z.r && z.x < W - z.r && z.y > AY + z.r && z.y < H - z.r) z.inside = true;
+    const bar = solid(z);
+    if (bar) { bar.hp -= z.dmg * 2.5 * dt; if (Math.random() < 0.1) burst(bar.x + 16, bar.y + 16, '#a07a45', 1, 60); }
+    z.atk -= dt;
+    if (bd < z.r + t.r + 4 && z.atk <= 0) { hurt(t, z.dmg); z.atk = 0.7; }
+    if (z.shoots && z.inside) {
+      z.shoot -= dt;
+      if (z.shoot <= 0 && bd < 420) {
+        z.shoot = rand(2, 3.2);
+        fireballs.push({ x: z.x, y: z.y - 6, vx: dx * 250, vy: dy * 250, life: 2.4 });
+      }
+    }
+  }
+  for (let i = 0; i < zombies.length; i++) for (let j = i + 1; j < zombies.length; j++) {
+    const a = zombies[i], b = zombies[j];
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), m = a.r + b.r;
+    if (d < m && d > 0) { const o = (m - d) / 2; a.x -= dx / d * o; a.y -= dy / d * o; b.x += dx / d * o; b.y += dy / d * o; }
+  }
+  for (const p of players) {
+    if (!p.alive) continue;
+    for (const z of zombies) {
+      const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy), m = p.r + z.r;
+      if (d < m && d > 0) { p.x = z.x + dx / d * m; p.y = z.y + dy / d * m; }
+    }
+    solid(p);
+  }
+
+  // bullets
+  for (const b of bullets) {
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    if (b.blast && Math.random() < 0.7) particles.push({ x: b.x, y: b.y, vx: rand(-20, 20), vy: rand(-20, 20), life: 0.4, max: 0.4, size: 5, color: '#8a8478' });
+    const boom = () => { b.dead = true; if (b.blast) explode(b.x, b.y, b.blast, b.blastDmg, b.owner); };
+    if (b.x < 0 || b.x > W || b.y < AY || b.y > H) { boom(); continue; }
+    if (OBST.some(o => inRect(b, o))) { burst(b.x, b.y, '#d8d0b0', 3, 90, 2); boom(); continue; }
+    for (const br of barrels) if (br.alive && dist(b, br) < br.r + 3) { b.dead = true; blowBarrel(br, b.owner); break; }
+    if (b.dead) continue;
+    for (const z of zombies) {
+      if (!z.dead && dist(b, z) < z.r + 4) {
+        if (b.blast) { damage(z, b.dmg, b.owner, b.vx, b.vy); boom(); }
+        else { b.dead = true; damage(z, b.dmg, b.owner, b.vx, b.vy); }
+        break;
+      }
+    }
+    if (b.life <= 0) b.dead = true;
+  }
+  bullets = bullets.filter(b => !b.dead);
+
+  // fireballs
+  for (const f of fireballs) {
+    f.x += f.vx * dt; f.y += f.vy * dt; f.life -= dt;
+    if (Math.random() < 0.6) particles.push({ x: f.x, y: f.y, vx: rand(-15, 15), vy: rand(-15, 15), life: 0.3, max: 0.3, size: 5, color: '#ff7a2f' });
+    if (f.life <= 0 || f.x < 0 || f.x > W || f.y < AY || f.y > H || OBST.some(o => inRect(f, o))) { f.dead = true; continue; }
+    for (const b of barricades) if (inRect(f, { x: b.x, y: b.y, w: CELL, h: CELL })) { b.hp -= 20; f.dead = true; break; }
+    if (f.dead) continue;
+    for (const p of players) if (p.alive && dist(f, p) < p.r + 6) { hurt(p, 14); f.dead = true; burst(f.x, f.y, '#ff7a2f', 8); break; }
+  }
+  fireballs = fireballs.filter(f => !f.dead);
+
+  zombies = zombies.filter(z => !z.dead);
+  barricades = barricades.filter(b => {
+    if (b.hp > 0) return true;
+    burst(b.x + 16, b.y + 16, '#8a6a3a', 14, 150, 5);
+    return false;
+  });
+  pickups = pickups.filter(k => (k.life -= dt) > 0);
+
+  // waves
+  if (state !== 'play') return;
+  if (intermission > 0) {
+    intermission -= dt;
+    if (intermission <= 0) nextWave();
+  } else if (toSpawn > 0) {
+    spawnT -= dt;
+    if (spawnT <= 0 && zombies.length < 28) {
+      spawnZombie(); toSpawn--;
+      spawnT = Math.max(0.25, 1.1 - wave * 0.06) * rand(0.6, 1.4);
+    }
+  } else if (zombies.length === 0) {
+    intermission = 4;
+    banner('Wave ' + wave + ' cleared', '#8fd67a');
+  }
+
+  updateFx(dt);
+}
+
+function updateFx(dt) {
+  for (const q of particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.9; q.vy *= 0.9; q.life -= dt; }
+  particles = particles.filter(q => q.life > 0);
+  for (const t of texts) { t.y -= 30 * dt; t.life -= dt; }
+  texts = texts.filter(t => t.life > 0);
+  if (banners.length) { banners[0].life -= dt; if (banners[0].life <= 0) banners.shift(); }
+  shake = Math.max(0, shake - dt * 30);
+}
+
+/* ---------- drawing ---------- */
+function drawBlock(x, y, s, body, head, dx, dy, walk, flash, arms) {
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.fillRect(x - s * 0.9, y + s * 0.65, s * 1.8, s * 0.45);
+  const bob = Math.sin(walk) * s * 0.18;
+  ctx.fillStyle = '#1d1c16';
+  ctx.fillRect(x - s * 0.6, y + s * 0.25 + Math.max(0, bob), s * 0.5, s * 0.55);
+  ctx.fillRect(x + s * 0.1, y + s * 0.25 + Math.max(0, -bob), s * 0.5, s * 0.55);
+  if (arms) {
+    ctx.fillStyle = flash ? '#fff' : head;
+    const ax = dx * s * 0.9, ay = dy * s * 0.9;
+    ctx.fillRect(x - s * 0.8 + ax, y - s * 0.4 + ay, s * 0.35, s * 0.35);
+    ctx.fillRect(x + s * 0.45 + ax, y - s * 0.4 + ay, s * 0.35, s * 0.35);
+  }
+  ctx.lineWidth = 2; ctx.strokeStyle = '#000';
+  ctx.fillStyle = flash ? '#fff' : body;
+  ctx.fillRect(x - s * 0.75, y - s * 0.7, s * 1.5, s * 1.05);
+  ctx.strokeRect(x - s * 0.75, y - s * 0.7, s * 1.5, s * 1.05);
+  ctx.fillStyle = flash ? '#fff' : head;
+  ctx.fillRect(x - s * 0.62, y - s * 1.65, s * 1.24, s * 1.0);
+  ctx.strokeRect(x - s * 0.62, y - s * 1.65, s * 1.24, s * 1.0);
+  if (dy > -0.6) {
+    ctx.fillStyle = arms ? '#ff3b2a' : '#000';
+    const ex = x + dx * s * 0.28, ey = y - s * 1.3 + Math.max(0, dy) * s * 0.12;
+    ctx.fillRect(ex - s * 0.38, ey, s * 0.22, s * 0.22);
+    ctx.fillRect(ex + s * 0.16, ey, s * 0.22, s * 0.22);
+  }
+}
+
+function drawPlayer(p) {
+  if (!p.alive) {
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(p.x - 16, p.y - 2, 32, 12);
+    ctx.fillStyle = '#6b665a'; ctx.fillRect(p.x - 15, p.y - 8, 30, 14);
+    ctx.fillStyle = p.head; ctx.fillRect(p.x + 6, p.y - 10, 12, 12);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(p.x - 15, p.y - 8, 30, 14);
+    if (p.rev > 0) {
+      ctx.strokeStyle = '#8fd67a'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(p.x, p.y - 2, 26, -1.571, -1.571 + 6.283 * p.rev / 3); ctx.stroke();
+    }
+    ctx.fillStyle = p.head; ctx.font = 'bold 12px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(p.name, p.x, p.y - 22);
+    return;
+  }
+  const blink = p.hurt > 0 && Math.floor(time * 20) % 2 === 0;
+  const gun = () => {
+    ctx.strokeStyle = '#111'; ctx.lineWidth = p.w === 3 ? 7 : p.w === 2 ? 5 : 4;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y - 4); ctx.lineTo(p.x + p.dx * 22, p.y - 4 + p.dy * 22); ctx.stroke();
+  };
+  if (p.dy < 0) gun();
+  drawBlock(p.x, p.y, p.r, p.body, p.head, p.dx, p.dy, p.walk, blink, false);
+  if (p.dy >= 0) gun();
+  ctx.fillStyle = p.head; ctx.font = 'bold 12px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(p.name, p.x, p.y - p.r * 1.9);
+}
+
+function drawZombie(z) {
+  drawBlock(z.x, z.y, z.r, z.body, z.head, z.dx, z.dy, z.walk, z.flash > 0, true);
+  if (z.hp < z.max) {
+    ctx.fillStyle = '#000'; ctx.fillRect(z.x - z.r, z.y - z.r * 2.1, z.r * 2, 4);
+    ctx.fillStyle = '#d0402f'; ctx.fillRect(z.x - z.r, z.y - z.r * 2.1, z.r * 2 * Math.max(0, z.hp / z.max), 4);
+  }
+}
+
+function drawWorld() {
+  ctx.drawImage(gnd, 0, 0);
+
+  for (const o of OBST) {
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(o.x + 5, o.y + 7, o.w, o.h);
+    ctx.fillStyle = '#6e6c5c'; ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.fillStyle = '#8d8a76'; ctx.fillRect(o.x, o.y, o.w, 7);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h);
+  }
+  for (const b of barricades) {
+    const k = b.hp / b.max;
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(b.x + 4, b.y + 5, CELL, CELL);
+    ctx.fillStyle = k > 0.5 ? '#8a6636' : k > 0.25 ? '#6e4f2a' : '#523a20';
+    ctx.fillRect(b.x, b.y, CELL, CELL);
+    ctx.strokeStyle = '#3a2812'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.x + 3, b.y + 3); ctx.lineTo(b.x + CELL - 3, b.y + CELL - 3);
+    ctx.moveTo(b.x + CELL - 3, b.y + 3); ctx.lineTo(b.x + 3, b.y + CELL - 3); ctx.stroke();
+    ctx.strokeStyle = '#000'; ctx.strokeRect(b.x, b.y, CELL, CELL);
+  }
+  for (const b of barrels) {
+    if (!b.alive) continue;
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 10, 14, 6, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#a3291f'; ctx.fillRect(b.x - 12, b.y - 14, 24, 24);
+    ctx.fillStyle = '#c9a227'; ctx.fillRect(b.x - 12, b.y - 4, 24, 5);
+    ctx.fillStyle = '#c8473a'; ctx.fillRect(b.x - 12, b.y - 14, 24, 5);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(b.x - 12, b.y - 14, 24, 24);
+  }
+  for (const k of pickups) {
+    if (k.life < 3 && Math.floor(time * 8) % 2) continue;
+    const bobY = Math.sin(time * 4 + k.x) * 2;
+    ctx.fillStyle = k.type === 'ammo' ? '#c9a227' : '#e6dfc8';
+    ctx.fillRect(k.x - 9, k.y - 9 + bobY, 18, 18);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(k.x - 9, k.y - 9 + bobY, 18, 18);
+    ctx.fillStyle = k.type === 'ammo' ? '#1d1c16' : '#c8322a';
+    if (k.type === 'ammo') { ctx.fillRect(k.x - 5, k.y - 5 + bobY, 3, 10); ctx.fillRect(k.x - 1, k.y - 5 + bobY, 3, 10); ctx.fillRect(k.x + 3, k.y - 5 + bobY, 3, 10); }
+    else { ctx.fillRect(k.x - 6, k.y - 2 + bobY, 12, 4); ctx.fillRect(k.x - 2, k.y - 6 + bobY, 4, 12); }
+  }
+
+  const actors = [...players.map(p => ({ y: p.alive ? p.y : p.y - 100, d: () => drawPlayer(p) })),
+                  ...zombies.map(z => ({ y: z.y, d: () => drawZombie(z) }))];
+  actors.sort((a, b) => a.y - b.y).forEach(a => a.d());
+
+  ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (const b of bullets) {
+    if (b.blast) {
+      ctx.fillStyle = '#e6dfc8'; ctx.fillRect(b.x - 4, b.y - 4, 8, 8);
+      continue;
+    }
+    ctx.strokeStyle = '#fff3c4';
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.015, b.y - b.vy * 0.015); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  for (const f of fireballs) {
+    ctx.fillStyle = 'rgba(255,120,40,.35)'; ctx.beginPath(); ctx.arc(f.x, f.y, 11, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, 6.283); ctx.fill();
+  }
+  for (const q of particles) {
+    ctx.globalAlpha = Math.max(0, q.life / q.max);
+    ctx.fillStyle = q.color; ctx.fillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.font = 'bold 14px "Trebuchet MS", sans-serif';
+  for (const t of texts) {
+    ctx.globalAlpha = Math.min(1, t.life * 2);
+    ctx.fillStyle = '#000'; ctx.fillText(t.t, t.x + 1, t.y + 1);
+    ctx.fillStyle = t.color; ctx.fillText(t.t, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHud() {
+  ctx.fillStyle = '#12110c'; ctx.fillRect(0, 0, W, AY);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, AY - 2, W, 2);
+  for (const p of players) {
+    const left = p.i === 0, x0 = left ? 12 : W - 12;
+    ctx.textAlign = left ? 'left' : 'right';
+    ctx.font = 'bold 15px "Trebuchet MS", sans-serif'; ctx.fillStyle = p.head;
+    ctx.fillText(p.name, x0, 18);
+    const bx = left ? x0 + 30 : x0 - 150;
+    ctx.fillStyle = '#2e2c24'; ctx.fillRect(bx, 7, 120, 12);
+    const fw = 120 * p.hp / 100;
+    ctx.fillStyle = p.hp > 35 ? '#6bbf4a' : '#d0402f';
+    ctx.fillRect(left ? bx : bx + 120 - fw, 7, fw, 12);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(bx, 7, 120, 12);
+    ctx.font = '13px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+    const w = WEAPONS[p.w];
+    const am = w.ammo === Infinity ? '∞' : p.ammo[p.w];
+    ctx.fillText(`${w.name} ${am}   Barricades ${p.build}`, x0, 34);
+    ctx.font = 'bold 14px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = p.combo > 1 ? '#f2d27a' : '#e6dfc8';
+    ctx.fillText(p.score + (p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''), left ? bx + 132 : bx - 12, 18);
+  }
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 17px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+  ctx.fillText('Wave ' + wave, W / 2, 18);
+  ctx.font = '12px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#8f8870';
+  ctx.fillText(intermission > 0 ? 'Next wave in ' + Math.ceil(intermission) : (zombies.length + toSpawn) + ' zombies left', W / 2, 34);
+
+  if (banners.length) {
+    const b = banners[0];
+    ctx.globalAlpha = Math.min(1, b.life * 2);
+    ctx.font = 'bold 30px Impact, "Arial Black", sans-serif';
+    ctx.fillStyle = '#000'; ctx.fillText(b.text, W / 2 + 2, 112);
+    ctx.fillStyle = b.color; ctx.fillText(b.text, W / 2, 110);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function shade(a) { ctx.fillStyle = `rgba(10,9,6,${a})`; ctx.fillRect(0, 0, W, H); }
+
+function drawTitle() {
+  drawWorld(); shade(0.72);
+  ctx.textAlign = 'center';
+  ctx.font = '96px Impact, "Arial Black", sans-serif';
+  ctx.fillStyle = '#000'; ctx.fillText('BLOCKROT', W / 2 + 5, 175);
+  ctx.fillStyle = '#86b066'; ctx.fillText('BLOCKROT', W / 2, 170);
+  ctx.font = '18px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+  ctx.fillText('Two players, one keyboard, too many zombies.', W / 2, 205);
+
+  const rows = [['Move', 'W A S D', 'Arrow keys'], ['Shoot', 'Space', 'Enter'],
+                ['Switch weapon', 'Q', 'Right Shift'], ['Place barricade', 'E', '/']];
+  ctx.font = 'bold 18px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = '#f2b134'; ctx.fillText('Player 1', W / 2 - 130, 270);
+  ctx.fillStyle = '#5fc6d6'; ctx.fillText('Player 2', W / 2 + 150, 270);
+  rows.forEach((r, i) => {
+    const y = 305 + i * 32;
+    ctx.textAlign = 'right'; ctx.font = '16px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#8f8870';
+    ctx.fillText(r[0], W / 2 - 220, y);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#e6dfc8'; ctx.font = 'bold 16px "Trebuchet MS", sans-serif';
+    ctx.fillText(r[1], W / 2 - 130, y); ctx.fillText(r[2], W / 2 + 150, y);
+  });
+  ctx.font = '15px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#8f8870';
+  ctx.fillText('You aim where you walk. Shoot red barrels. Stand next to a downed partner for 3 seconds to revive them.', W / 2, 460);
+  ctx.fillText('New weapons unlock on waves 2, 3 and 5.' + (best ? `  Best: wave ${best}` : ''), W / 2, 484);
+  if (Math.floor(performance.now() / 500) % 2 === 0) {
+    ctx.font = 'bold 24px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText('Press Space or Enter to start', W / 2, 560);
+  }
+}
+
+function draw() {
+  ctx.save();
+  if (shake > 0) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+  if (state === 'title') { drawTitle(); ctx.restore(); return; }
+  drawWorld();
+  ctx.restore();
+  drawHud();
+  ctx.textAlign = 'center';
+  if (state === 'paused') {
+    shade(0.6);
+    ctx.font = '64px Impact, "Arial Black", sans-serif'; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText('Paused', W / 2, H / 2);
+    ctx.font = '18px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#8f8870';
+    ctx.fillText('P to resume, R to restart', W / 2, H / 2 + 40);
+  } else if (state === 'over') {
+    shade(0.7);
+    ctx.font = '76px Impact, "Arial Black", sans-serif';
+    ctx.fillStyle = '#000'; ctx.fillText('OVERRUN', W / 2 + 4, H / 2 - 56);
+    ctx.fillStyle = '#d0402f'; ctx.fillText('OVERRUN', W / 2, H / 2 - 60);
+    ctx.font = '22px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText(`You made it to wave ${wave}. Best: wave ${best}`, W / 2, H / 2 - 10);
+    ctx.fillStyle = '#f2b134'; ctx.fillText('P1  ' + players[0].score, W / 2 - 110, H / 2 + 30);
+    ctx.fillStyle = '#5fc6d6'; ctx.fillText('P2  ' + players[1].score, W / 2 + 110, H / 2 + 30);
+    ctx.font = 'bold 20px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText('Press R to play again', W / 2, H / 2 + 80);
+  }
+}
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  if (state === 'title') {
+    if (tap(['Space', 'Enter', 'NumpadEnter'])) startGame();
+  } else if (state === 'play') {
+    if (tap(['KeyP', 'Escape'])) state = 'paused';
+    else if (tap(['KeyR'])) startGame();
+    else update(dt);
+  } else if (state === 'paused') {
+    if (tap(['KeyP', 'Escape'])) state = 'play';
+    else if (tap(['KeyR'])) startGame();
+  } else if (state === 'over') {
+    updateFx(dt);
+    if (tap(['KeyR'])) startGame();
+  }
+  draw();
+  for (const k in pressed) delete pressed[k];
+  requestAnimationFrame(loop);
+}
+resetGround();
+cv.focus();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
