@@ -344,7 +344,7 @@ const GAME_MODES = {
 const DM_TARGET = 25, TDM_TARGET = 60;
 const RESPAWN_TIME = 3.5, SPAWN_PROT = 2.0;
 const PVP_WEAPON_SPOTS = [[300,300],[2100,300],[300,1300],[2100,1300],[1200,180],[1200,1420],
-                          [700,800],[1700,800],[1200,640],[1200,960],[480,1120],[1920,480]];
+                          [700,800],[1700,800],[1000,640],[1400,960],[480,1120],[1920,480]];
 const PVP_DROP_EVERY = 9;        // seconds between fresh arena weapon drops
 // Gun game ladder: work your way from a pistol to the knife.
 const GG_LADDER = ['m1911','mp5','ak47','m870','deagle','famas','uzi','m14','spas12','flamer',
@@ -394,6 +394,9 @@ let guests = [], roster = [], roomCode = '';
 let gameMode = 'coop';
 let myClass = 'soldier';
 let netHeld = {}, netTaps = {};
+let kickOpen = false, lastPing = 0;
+const banned = new Set();
+const PEER_TIMEOUT = 12000;      // no word from a guest for this long = they are gone
 const decalQueue = [];
 const isHost = () => mode !== 'guest';
 const PVP = () => !!GAME_MODES[gameMode].pvp;
@@ -529,7 +532,12 @@ function setupMap() {
 }
 
 /* ---------------- state ---------------- */
-let state = 'title', wave = 0, time = 0, shake = 0;
+let state = 'title', wave = 0, time = 0, shake = 0, shakeX = 0, shakeY = 0;
+// Shake used to stack from every explosion at once and strobe the whole screen.
+// Everything now goes through addShake, which scales it down and caps it, and
+// the drawn offset is smoothed so it reads as a rumble instead of a flicker.
+const SHAKE_SCALE = .38, SHAKE_MAX = 6;
+function addShake(v) { shake = Math.min(SHAKE_MAX, Math.max(shake, v * SHAKE_SCALE)); }
 let players = [], zombies = [], bullets = [], eshots = [], barricades = [], puddles = [];
 let barrels = [], particles = [], pickups = [], loot = [], texts = [], banners = [], beams = [], bolts = [];
 let minions = [], feed = [];
@@ -743,13 +751,15 @@ function dropArenaWeapon() {
     !loot.some(l => Math.hypot(l.x - x, l.y - y) < 60) &&
     !players.some(q => q.alive && !q.gone && Math.hypot(q.x - x, q.y - y) < 150));
   if (!spots.length) return;
-  const [x, y] = pick(spots);
+  const [sx, sy] = pick(spots);
+  const [x, y] = freeSpot(sx, sy, 12);
   const rare = Math.random();
   const item = rare < .08 ? { kind:'weapon', id: pick(Object.keys(LEGENDARY)), rarity:'legendary' }
              : rare < .3  ? { kind:'weapon', id: rollWeaponId(5), rarity:'rare' }
              : Math.random() < .25 ? rollMod()
              : { kind:'weapon', id: rollWeaponId(5), rarity:'base' };
-  loot.push({ x, y, r: 12, item, bob: rand(0, 6), life: 40 });
+  const l = { x, y, r: 12, item, bob: rand(0, 6), cool: 0, life: 40 };
+  solid(l); loot.push(l);
 }
 function pvpScoreOf(p) { return gameMode === 'gg' ? p.gg : p.kills; }
 function checkPvpEnd() {
@@ -763,7 +773,7 @@ function checkPvpEnd() {
     const w = players.filter(p => !p.gone).sort((a, b) => b.kills - a.kills)[0];
     if (w && w.kills >= DM_TARGET) pvpEnd = w.name + ' wins the deathmatch';
   }
-  if (pvpEnd) { state = 'over'; banner(pvpEnd, '#f2d27a', true); shake = 14; }
+  if (pvpEnd) { state = 'over'; banner(pvpEnd, '#f2d27a', true); addShake(14); }
 }
 function playerKilled(p, src) {
   p.alive = false; p.deaths++; p.hp = 0; p.combo = 0; p.shield = 0;
@@ -900,17 +910,43 @@ function spawnBoss() {
   const gt = farGate();
   const z = makeBoss(key, gt.x, gt.y, false);
   banner(z.name + ' has arrived', '#e2735f', true);
-  shake = 12;
+  addShake(12);
 }
 function spawnMini() {
   const key = pick(bossOrder);
   const gt = farGate();
   const z = makeBoss(key, gt.x + (gt.jx ? rand(-40, 40) : 0), gt.y + (gt.jy ? rand(-40, 40) : 0), true);
   banner(z.name + ' broke through the gate', '#e2735f');
-  shake = Math.max(shake, 6);
+  addShake(6);
 }
 
 /* ---------------- physics ---------------- */
+// Nearest spot a pickup can actually be walked to. Anything dropped on a wall
+// (arena weapon pads, boss loot rings, a corpse inside a pillar) gets nudged out.
+function freeSpot(x, y, r = 12) {
+  const lo = r + 4;
+  x = clamp(x, lo, WW - lo); y = clamp(y, lo, WH - lo);
+  const ok = (px, py) => !isBlockedAt(px, py) && !isBlockedAt(px - r, py) && !isBlockedAt(px + r, py)
+                      && !isBlockedAt(px, py - r) && !isBlockedAt(px, py + r);
+  if (ok(x, y)) return [x, y];
+  for (let ring = 1; ring <= 8; ring++) {
+    for (let a = 0; a < 12; a++) {
+      const ang = a / 12 * 6.283 + ring * .4;
+      const nx = clamp(x + Math.cos(ang) * ring * CELL, lo, WW - lo);
+      const ny = clamp(y + Math.sin(ang) * ring * CELL, lo, WH - lo);
+      if (ok(nx, ny)) return [nx, ny];
+    }
+  }
+  let bx = x, by = y, bd = 1e18;                 // last resort: nearest open cell anywhere
+  for (let cy = 0; cy < GH; cy++) for (let cx = 0; cx < GW; cx++) {
+    if (blocked[cy * GW + cx]) continue;
+    const px = cx * CELL + CELL / 2, py = cy * CELL + CELL / 2;
+    const d = (px - x) * (px - x) + (py - y) * (py - y);
+    if (d < bd) { bd = d; bx = px; by = py; }
+  }
+  return [bx, by];
+}
+
 function pushOut(e, rx, ry, rw, rh) {
   const cx = clamp(e.x, rx, rx + rw), cy = clamp(e.y, ry, ry + rh);
   const dx = e.x - cx, dy = e.y - cy, d2 = dx * dx + dy * dy;
@@ -965,7 +1001,8 @@ function dropWeapon(p, quiet) {
   if (gameMode === 'gg') { if (!quiet) floatText(p.x, p.y - 34, 'No dropping in gun game', '#8f8870'); return null; }
   const s = p.slots.splice(p.cur, 1)[0];
   p.cur = clamp(p.cur, 0, p.slots.length - 1);
-  const l = { x: p.x + p.dx * 26, y: p.y + p.dy * 26, r: 12, item: slotArrOf(s), bob: rand(0, 6), cool: .8, life: 90 };
+  const [lx, ly] = freeSpot(p.x + p.dx * 26, p.y + p.dy * 26, 12);
+  const l = { x: lx, y: ly, r: 12, item: slotArrOf(s), bob: rand(0, 6), cool: .8, life: 90 };
   solid(l); loot.push(l);
   floatText(p.x, p.y - 34, 'Dropped ' + s.name, RARITY_COLOR[s.rarity]);
   return l;
@@ -996,7 +1033,7 @@ function fireOnce(p, s, st) {
     shoot(p, s, st, ox, oy, a);
     particles.push({ x: ox + p.dx * 6, y: oy + p.dy * 6, vx: 0, vy: 0, life: .05, max: .05, size: 9, color: s.def.color });
   }
-  if (s.def.kind === 'rocket' || s.def.kind === 'plasma') shake = Math.max(shake, 3);
+  if (s.def.kind === 'rocket' || s.def.kind === 'plasma') addShake(3);
   if (s.ammo <= 0) { floatText(p.x, p.y - 34, s.name + ' empty', '#f2d27a'); switchNext(p); }
 }
 
@@ -1245,7 +1282,7 @@ function damagePlayer(p, d, src, iframe, slot) {
   p.hurt = Math.max(p.hurt, iframe || .06);
   if (d <= 0) return;
   p.hp -= d;
-  if (p === players[myIndex]) shake = Math.max(shake, 5);
+  if (p === players[myIndex]) addShake(4);
   burst(p.x, p.y, '#b8322a', 5);
   if (src && src.tag === 'p') onDamageDealt(src, slot, d);
   if (p.hp <= 0) {
@@ -1350,17 +1387,22 @@ function kill(z, owner, slot) {
   const dm = activeMods.has('loot') ? 2 : 1;
   const r = Math.random();
   if (r < .035 * dm) dropLoot(z.x, z.y, { kind:'weapon', id: rollWeaponId(), rarity: Math.random() < .12 ? 'rare' : 'base' });
-  else if (r < .09 * dm) { if (!activeMods.has('scarce')) pickups.push({ x: z.x, y: z.y, type: 'ammo', life: 15 }); }
-  else if (r < .13 * dm) pickups.push({ x: z.x, y: z.y, type: 'med', life: 15 });
+  else if (r < .09 * dm) { if (!activeMods.has('scarce')) dropPickup(z.x, z.y, 'ammo'); }
+  else if (r < .13 * dm) dropPickup(z.x, z.y, 'med');
 }
 
+function dropPickup(x, y, type) {
+  const [px, py] = freeSpot(x, y, 12);
+  pickups.push({ x: px, y: py, type, life: 15 });
+}
 function dropLoot(x, y, item) {
-  const l = { x: clamp(x, 30, WW - 30), y: clamp(y, 30, WH - 30), r: 12, item, bob: rand(0, 6), cool: 0, life: 120 };
+  const [fx, fy] = freeSpot(x, y, 12);
+  const l = { x: fx, y: fy, r: 12, item, bob: rand(0, 6), cool: 0, life: 120 };
   solid(l); loot.push(l);
   return l;
 }
 function explode(x, y, rad, dmg, owner, slot, hurtPlayers = 0, tint) {
-  shake = Math.max(shake, Math.min(10, rad / 10));
+  addShake(Math.min(10, rad / 10));
   const big = rad >= 90;
   burst(x, y, tint || '#ffb347', big ? 22 : 10, rad * 2.4, big ? 7 : 5);
   burst(x, y, '#5a5448', big ? 14 : 5, 120, 9);
@@ -1387,7 +1429,7 @@ function blowBarrel(b, owner, slot) {
   explode(b.x, b.y, 120, 150, owner, slot, PVP() ? 60 : 0);
 }
 function bloatBoom(z) {
-  shake = Math.max(shake, 8);
+  addShake(8);
   burst(z.x, z.y, '#b6e04a', 26, 240, 7);
   puddles.push({ x: z.x, y: z.y, r: 50, life: 5 });
   for (const p of players) if (p.alive && !p.gone && dist(p, z) < 95) hurt(p, 28);
@@ -1403,7 +1445,7 @@ function rollLegendary() {
 }
 function rollMod() { return { kind: 'mod', id: pick(Object.keys(MODS)) }; }
 function bossDeath(z, owner) {
-  shake = z.mini ? 10 : 20;
+  addShake(z.mini ? 8 : 16);
   if (z.mini) {
     dropLoot(z.x, z.y, Math.random() < .5 ? rollMod() : rollRare());
     banner(z.name + ' is down', '#ff9f1a');
@@ -1605,7 +1647,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
           z.x = z.bx; z.y = z.by;
           for (let k = 0; k < 10; k++) eShot(z.x, z.y, k / 10 * 6.283, 210, 'orb');
           burst(z.x, z.y, '#9ad7ff', 20, 200, 6);
-          shake = Math.max(shake, 8);
+          addShake(8);
         }
       } else if (z.t1 <= 0) {
         z.t1 = 5.5 * rg;
@@ -1628,7 +1670,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       }
       if (z.t2 <= 0) {
         z.t2 = 4.6 * rg;
-        shake = Math.max(shake, 10);
+        addShake(10);
         beams.push({ ring: true, x1: z.x, y1: z.y, r: 230, color: '#8c969e', life: .45, max: .45 });
         for (const p of players) if (p.alive && !p.gone && dist(p, z) < 230) hurt(p, z.dmg);
         for (let k = 0; k < 12; k++) eShot(z.x, z.y, k / 12 * 6.283 + .2, 250, 'bone');
@@ -2219,7 +2261,8 @@ function takeLoot(p, l, force) {
   const s = made();
   p.slots[p.cur] = s;
   l.taken = true;
-  const dl = { x: l.x, y: l.y, r: 12, item: slotArrOf(cur), bob: rand(0, 6), cool: .8, life: 90 };
+  const [dx2, dy2] = freeSpot(l.x, l.y, 12);
+  const dl = { x: dx2, y: dy2, r: 12, item: slotArrOf(cur), bob: rand(0, 6), cool: .8, life: 90 };
   solid(dl); loot.push(dl);
   banner(`${p.name} swapped ${cur.name} for ${s.name}`, RARITY_COLOR[s.rarity]);
   burst(l.x, l.y, RARITY_COLOR[it.rarity], 20, 200, 5);
@@ -2239,7 +2282,7 @@ function updateFx(dt) {
   for (const f of feed) f.life -= dt;
   feed = feed.filter(f => f.life > 0);
   if (banners.length) { banners[0].life -= dt * (banners.length > 2 ? 2 : 1); if (banners[0].life <= 0) banners.shift(); }
-  shake = Math.max(0, shake - dt * 30);
+  shake = Math.max(0, shake - dt * 44);
 }
 
 /* ---------------- drawing ---------------- */
@@ -2451,7 +2494,11 @@ function drawLoot(l) {
 }
 
 function drawWorld() {
-  const sx = shake ? rand(-shake, shake) : 0, sy = shake ? rand(-shake, shake) : 0;
+  if (shake > 0) {
+    shakeX = (shakeX + rand(-shake, shake)) * .5;
+    shakeY = (shakeY + rand(-shake, shake)) * .5;
+  } else { shakeX *= .82; shakeY *= .82; }
+  const sx = shakeX, sy = shakeY;
   ctx.setTransform(zoom, 0, 0, zoom, W / 2 - camX * zoom + sx, AY + (H - AY) / 2 - camY * zoom + sy);
   const vx0 = camX - W / 2 / zoom - 60, vx1 = camX + W / 2 / zoom + 60;
   const vy0 = camY - (H - AY) / 2 / zoom - 60, vy1 = camY + (H - AY) / 2 / zoom + 60;
@@ -2847,7 +2894,7 @@ function drawHud() {
   }
   if (mode !== 'solo') {
     ctx.textAlign = 'right'; ctx.font = `12px ${FONT}`; ctx.fillStyle = '#8f8870';
-    ctx.fillText(roomCode ? `Room ${roomCode}  ·  ${teamSize()} players` : '', W - 14, 20);
+    ctx.fillText(roomCode ? `Room ${roomCode}  ·  ${teamSize()} players${mode === 'host' ? '  ·  K to remove' : ''}` : '', W - 14, 20);
   }
 
   let y = AY + 8;
@@ -3025,6 +3072,10 @@ function drawShopColumn(p, x0, hint) {
   ctx.textAlign = 'left'; ctx.font = `13px ${FONT}`;
   ctx.fillStyle = p.msgT > 0 ? '#f2d27a' : '#8f8870';
   ctx.fillText(p.msgT > 0 ? p.msg : hint, x0 + 18, y0 + 494);
+  if (mode === 'host' && guests.length) {
+    ctx.fillStyle = '#a9a28a';
+    ctx.fillText('Host: H starts the wave now  ·  K removes a player', x0 + 18, y0 + 532);
+  }
   const carried = p.slots.map(s => s.name + (modLabel(s) ? ' +' + modLabel(s) : '')).join('   ·   ');
   ctx.fillStyle = '#a9a28a'; ctx.font = `12px ${FONT}`;
   ctx.fillText('Carrying: ' + carried, x0 + 18, y0 + 516, colW - 36);
@@ -3116,7 +3167,43 @@ function drawOver() {
   ctx.fillText('Press R to play again', W / 2, H / 2 + 64 + (list.length > 2 ? rows : 1) * 28);
 }
 
+function drawKickMenu() {
+  const list = kickList();
+  const rows = Math.max(1, list.length);
+  const w = 480, h = 92 + rows * 26;
+  const x = W / 2 - w / 2, y = H / 2 - h / 2;
+  ctx.fillStyle = 'rgba(12,11,8,.95)'; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#e2735f'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+  ctx.textAlign = 'left'; ctx.font = `bold 20px ${FONT}`; ctx.fillStyle = '#e2735f';
+  ctx.fillText('Remove a player', x + 18, y + 30);
+  ctx.font = `12px ${FONT}`; ctx.fillStyle = '#8f8870';
+  ctx.fillText('Host only. They cannot rejoin this room.', x + 18, y + 48);
+  if (!list.length) {
+    ctx.font = `14px ${FONT}`; ctx.fillStyle = '#a9a28a';
+    ctx.fillText('Nobody else is in the room.', x + 18, y + 76);
+  } else list.forEach((gst, i) => {
+    const yy = y + 76 + i * 26;
+    const pl = players[gst.idx];
+    ctx.font = `bold 15px ${FONT}`; ctx.fillStyle = '#f2d27a';
+    ctx.fillText(String(i + 1), x + 20, yy);
+    ctx.fillStyle = pl ? pl.head : '#e6dfc8';
+    ctx.fillText(gst.name, x + 44, yy);
+    ctx.font = `13px ${FONT}`; ctx.fillStyle = '#8f8870';
+    ctx.fillText(CLASSES[cleanClass(gst.cls)].name, x + 190, yy);
+    const quiet = (performance.now() - (gst.seen || 0)) / 1000;
+    ctx.fillStyle = quiet > 5 ? '#e2735f' : '#6b665a';
+    ctx.fillText(quiet > 5 ? `quiet for ${Math.floor(quiet)}s` : 'connected', x + 300, yy);
+  });
+  ctx.font = `13px ${FONT}`; ctx.fillStyle = '#a9a28a';
+  ctx.fillText('Press a number to remove  ·  K or Esc to close', x + 18, y + h - 14);
+}
+
 function draw() {
+  drawFrame();
+  if (kickOpen && mode === 'host') drawKickMenu();
+}
+
+function drawFrame() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#16140f'; ctx.fillRect(0, 0, W, H);
   if (state === 'title') { drawTitle(); return; }
@@ -3184,7 +3271,8 @@ function lobbyText() {
   const gm = GAME_MODES[gameMode].name;
   if (mode === 'host') {
     setNet(`Room code: ${roomCode}   ${gm}   Players ${roster.length}/${MAX_PLAYERS}: ${names}. ` +
-           (guests.length ? 'Press Space or Enter to start. Friends can still join mid-game.' : 'Waiting for friends to join...'));
+           (guests.length ? 'Press Space or Enter to start, or K to remove someone. Friends can still join mid-game.'
+                          : 'Waiting for friends to join...'));
   } else if (mode === 'guest') {
     setNet(`Room ${roomCode}   ${gm}   Players ${roster.length}/${MAX_PLAYERS}: ${names}. Waiting for the host to start.`);
   }
@@ -3218,7 +3306,8 @@ function guestJoined(c) {
   const idx = freeIndex();
   if (idx < 0) { sendTo(c, { t: 'full' }); setTimeout(() => { try { c.close(); } catch (e) {} }, 800); return; }
   const meta = c.metadata || {};
-  const gst = { conn: c, idx, name: cleanName(meta.name, 'P' + (idx + 1)), cls: cleanClass(meta.cls) };
+  if (banned.has(c.peer)) { sendTo(c, { t: 'kicked' }); setTimeout(() => { try { c.close(); } catch (e) {} }, 500); return; }
+  const gst = { conn: c, idx, name: cleanName(meta.name, 'P' + (idx + 1)), cls: cleanClass(meta.cls), seen: performance.now() };
   guests.push(gst);
   roster = roster.filter(r => r.idx !== idx).concat([{ idx, name: gst.name, cls: gst.cls }]).sort((a, b) => a.idx - b.idx);
   netHeld[idx] = {}; netTaps[idx] = {};
@@ -3251,10 +3340,11 @@ function addLatePlayer(idx, name, cls) {
     p.cash = others.length ? Math.round(others.reduce((a, q) => a + q.cash, 0) / others.length / 2) : 0;
   }
   p.hurt = 1; p.spawnProt = SPAWN_PROT;
+  if (state === 'shop') { p.offers = rollOffers(p, OFFER_COUNT); p.ready = false; }
   while (players.length < idx) { const filler = newPlayer(players.length); filler.gone = true; filler.alive = false; players.push(filler); }
   players[idx] = p;
 }
-function guestLeft(gst) {
+function guestLeft(gst, why) {
   const k = guests.indexOf(gst);
   if (k < 0) return;
   guests.splice(k, 1);
@@ -3264,7 +3354,7 @@ function guestLeft(gst) {
     const p = players[gst.idx];
     p.gone = true; p.alive = false;
     for (const m of minions) if (m.owner === p) m.dead = true;
-    banner(p.name + ' left the game', '#e2735f');
+    banner(p.name + ' ' + (why || 'left the game'), '#e2735f');
     if (!PVP() && players.every(q => !q.alive || q.gone)) gameOver();
   }
   broadcastLobby();
@@ -3272,7 +3362,8 @@ function guestLeft(gst) {
 }
 function broadcastLobby() { send({ t: 'lobby', roster, code: roomCode, gm: gameMode }); }
 function onHostData(gst, d) {
-  if (!d || typeof d !== 'object') return;
+  gst.seen = performance.now();
+  if (!d || typeof d !== 'object' || d.t === 'ping') return;
   if (d.t === 'held' && d.h) {
     const h = netHeld[gst.idx] = {};
     for (const a of ACTIONS) h[a] = !!d.h[a];
@@ -3284,6 +3375,44 @@ function onHostData(gst, d) {
     if (r) r.cls = gst.cls;
     broadcastLobby(); lobbyText();
   }
+}
+
+/* ---------------- host controls: kick anyone, clear out ghosts ---------------- */
+const DIGIT_KEYS = [1,2,3,4,5,6,7,8,9].map(n => ['Digit' + n, 'Numpad' + n]);
+function kickList() { return guests.slice().sort((a, b) => a.idx - b.idx); }
+function kickGuest(gst) {
+  if (!gst) return;
+  if (gst.conn && gst.conn.peer) banned.add(gst.conn.peer);
+  sendTo(gst.conn, { t: 'kicked' });
+  const c = gst.conn;
+  setTimeout(() => { try { c.close(); } catch (e) {} }, 400);
+  guestLeft(gst, 'was removed by the host');
+  if (state === 'title') setNet(gst.name + ' was removed. ' + netEl.textContent);
+}
+// A browser that is closed or asleep often never fires 'close', which used to
+// leave a player who can never ready up and a shop nobody could leave.
+function dropDeadGuests() {
+  if (mode !== 'host' || !guests.length) return;
+  const now = performance.now();
+  for (const gst of guests.slice()) {
+    const gone = (gst.conn && gst.conn.open === false) || now - (gst.seen || now) > PEER_TIMEOUT;
+    if (!gone) continue;
+    try { gst.conn.close(); } catch (e) {}
+    guestLeft(gst, 'lost connection');
+  }
+}
+function hostKeys() {
+  if (mode !== 'host') { kickOpen = false; return; }
+  if (tap(['KeyK'])) { kickOpen = !kickOpen; delete pressed.KeyK; }
+  if (!kickOpen) return;
+  if (tap(['Escape'])) { kickOpen = false; delete pressed.Escape; }
+  else {
+    const list = kickList();
+    for (let i = 0; i < Math.min(9, list.length); i++) {
+      if (tap(DIGIT_KEYS[i])) { kickGuest(list[i]); kickOpen = guests.length > 0; break; }
+    }
+  }
+  for (const pair of DIGIT_KEYS) for (const k of pair) delete pressed[k];   // no weapon swap while the list is open
 }
 
 /* guest side */
@@ -3316,6 +3445,7 @@ function onGuestData(d) {
   if (d.t === 'welcome') { myIndex = d.idx; if (d.code) roomCode = d.code; if (d.gm) { gameMode = d.gm; syncModeButtons(); } }
   else if (d.t === 'lobby') { roster = d.roster || []; if (d.gm) { gameMode = d.gm; syncModeButtons(); } if (state === 'title') lobbyText(); }
   else if (d.t === 'full') { lobby = 'full'; cleanupNet(); setNet(`That room is full (${MAX_PLAYERS} players).`); }
+  else if (d.t === 'kicked') { lobby = 'none'; cleanupNet(); state = 'title'; setNet('The host removed you from the room.'); }
   else if (d.t === 'start') guestStart(d.gm);
   else if (d.t === 'snap') applySnap(d);
 }
@@ -3356,7 +3486,7 @@ function snapshot() {
   const ci = c => { let i = pal.indexOf(c); if (i < 0) { i = pal.length; pal.push(c); } return i; };
   const out = {
     t: 'snap', st: state, gm: gameMode, wave, ts: toSpawn + miniQueue, cl: f2(clearT), it: f2(intermission),
-    te: teamEnergy, am: [...activeMods], nm: nextMods, sh: r(shake), best, tsc: teamScore, pe: pvpEnd,
+    te: teamEnergy, am: [...activeMods], nm: nextMods, sh: f2(shake), best, tsc: teamScore, pe: pvpEnd,
     ma: Object.keys(mastery).map(k => mastery[k].lv),
     pl: players.map(p => ({
       x: r(p.x), y: r(p.y), dx: f2(p.dx), dy: f2(p.dy), hp: r(p.hp), mh: maxHp(p), al: p.alive, g: p.gone ? 1 : 0,
@@ -3437,7 +3567,7 @@ function applySnap(S) {
   if (S.gm && S.gm !== gameMode) { gameMode = S.gm; setupMap(); resetGround(); }
   const pal = S.pal || [];
   state = S.st; wave = S.wave; toSpawn = S.ts; clearT = S.cl; intermission = S.it; teamEnergy = S.te;
-  activeMods = new Set(S.am); nextMods = S.nm; shake = S.sh; best = Math.max(best, S.best || 0);
+  activeMods = new Set(S.am); nextMods = S.nm; shake = Math.min(SHAKE_MAX, S.sh); best = Math.max(best, S.best || 0);
   teamScore = S.tsc || [0, 0]; pvpEnd = S.pe || '';
   Object.keys(mastery).forEach((k, i) => { mastery[k].lv = S.ma[i] || 0; });
 
@@ -3629,6 +3759,11 @@ document.getElementById('bSolo').addEventListener('click', e => {
 document.getElementById('bHost').addEventListener('click', e => { e.currentTarget.blur(); hostOnline(); cv.focus(); });
 document.getElementById('bJoin').addEventListener('click', e => { e.currentTarget.blur(); joinOnline(); cv.focus(); });
 
+// Runs off the render loop so a backgrounded tab still reports in.
+setInterval(() => {
+  if (mode === 'guest' && conn && conn.open) { send({ t: 'ping' }); lastPing = performance.now(); }
+}, 2000);
+
 /* ---------------- loop ---------------- */
 let last = performance.now();
 function loop(now) {
@@ -3641,6 +3776,8 @@ function loop(now) {
   } else if (mode === 'guest') {
     if (state !== 'title' && myIndex >= 0 && players[myIndex]) { guestSendInput(); guestFrame(dt); }
   } else {
+    dropDeadGuests();
+    hostKeys();
     const remote = Object.values(netTaps);
     const wantPause = tap(['KeyP', 'Escape']) || remote.some(t => t.pause);
     const wantRestart = tap(['KeyR']) || remote.some(t => t.restart);
@@ -3655,6 +3792,7 @@ function loop(now) {
       if (wantPause) state = 'paused';
       else update(dt);
     } else if (state === 'shop') {
+      if (mode === 'host' && tap(['KeyH'])) for (const q of players) if (!q.gone) q.ready = true;
       shopInput(dt);
       updateFx(dt);
     } else if (state === 'paused') {
