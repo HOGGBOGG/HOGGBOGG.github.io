@@ -16,15 +16,17 @@
   #bar a:focus-visible { outline:2px solid #f2b134; outline-offset:2px; }
   #stage { position:relative; }
   #menu { position:absolute; left:50%; bottom:5%; transform:translateX(-50%);
-    display:flex; flex-direction:column; align-items:center; gap:10px;
-    background:rgba(18,17,12,.92); border:2px solid #3a362a; padding:14px 18px; width:min(560px, 92%); }
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    background:rgba(18,17,12,.92); border:2px solid #3a362a; padding:10px 16px; width:min(580px, 94%); }
   #menu .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%; }
   #menu button, #menu input { font:bold 15px "Trebuchet MS", sans-serif; padding:9px 14px;
     border:2px solid #000; background:#3a362a; color:var(--ink); cursor:pointer; }
   #menu button:hover { background:#4e493a; }
   #menu button.main { background:#5f8a45; }
   #menu button.main:hover { background:#6f9c53; }
-  #menu input { background:#0e0d09; cursor:text; width:130px; text-transform:uppercase; letter-spacing:3px; }
+  #menu input { background:#0e0d09; cursor:text; }
+  #menu #code { width:130px; text-transform:uppercase; letter-spacing:3px; }
+  #menu #pname { width:150px; }
   #menu button:focus-visible, #menu input:focus-visible { outline:2px solid #f2b134; outline-offset:2px; }
   #net { font-size:14px; color:#f2d27a; min-height:1.3em; text-align:center; }
 </style>
@@ -40,6 +42,7 @@
         <button id="bHost">Host online game</button>
       </div>
       <div class="row">
+        <input id="pname" maxlength="12" placeholder="Your name" aria-label="Your name (for online games)" autocomplete="off">
         <input id="code" maxlength="5" placeholder="CODE" aria-label="Room code" autocomplete="off">
         <button id="bJoin">Join online game</button>
       </div>
@@ -51,7 +54,7 @@
 <script>
 "use strict";
 /* =====================================================================
-   BLOCKROT v4 — tweakable data lives in the CONFIG section just below.
+   BLOCKROT v5 — tweakable data lives in the CONFIG section just below.
    ===================================================================== */
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const W = 1200, H = 760, AY = 52;            // screen size, HUD height
@@ -93,9 +96,9 @@ const MASTERY_PERKS = [
   'Dual wield: double shots, +50% ammo'
 ];
 
-// Kill combos are shared: when either player kills something, both alive
-// players' combo multipliers go up. With SHARE_CHAIN on, the partner's mastery
-// chain for whatever weapon THEY are holding goes up too.
+// Kill combos are shared: when anyone kills something, every alive player's
+// combo multiplier goes up. With SHARE_CHAIN on, every other alive player's
+// mastery chain for whatever weapon THEY are holding goes up too.
 const SHARE_COMBO = true;
 const SHARE_CHAIN = true;
 
@@ -137,9 +140,22 @@ const SHOP = [
   { id:'ready',  name:'Ready',                 desc:'The next wave starts when both players are ready' }
 ];
 
+/* ---------------- CONFIG: online squad ---------------- */
+const MAX_PLAYERS = 10;       // online room size (one keyboard is always 2 players)
+const ONLINE_ZOOM = 0.8;      // online, each screen follows its own player at this zoom
+// With more players: more zombies, tougher bosses, more loot, and mastery / airstrike
+// need more kills (scaled by team size / 2).
+const PLAYER_COLORS = [
+  ['#c98a1e','#f2b134'], ['#2f8fa0','#5fc6d6'], ['#8e3fa0','#c77ddb'], ['#3f8f4a','#7fd08a'],
+  ['#a8433a','#ef7a6d'], ['#3a5fa8','#7aa2f0'], ['#8a7a2a','#e8d35c'], ['#2f7a74','#6fd1c6'],
+  ['#6e6e6e','#d8d8d8'], ['#a0306a','#f07ab4']
+];
+const SPAWNS = [[1120,1100],[1280,1100],[1060,1200],[1150,1200],[1250,1200],
+                [1340,1200],[1060,1280],[1150,1280],[1250,1280],[1340,1280]];
+
 /* ---------------- CONFIG: team abilities ---------------- */
-const ENERGY_MAX = 50;        // team kills needed to charge the airstrike
-const STRIKE_WINDOW = 0.8;    // both players must press within this many seconds
+const ENERGY_MAX = 50;        // team kills needed to charge the airstrike (2 players)
+const STRIKE_WINDOW = 0.8;    // two players must press within this many seconds
 const MEDKIT_CD = 25;         // seconds
 const CASH_RATE = 0.4;        // cash earned per point scored
 
@@ -204,7 +220,7 @@ const CTRL = [
 const BLOCK = new Set(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Slash','Enter','Period','Quote','Semicolon']);
 addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') {
-    if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); joinOnline(); }
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && e.target.id === 'code') { e.preventDefault(); joinOnline(); }
     return;
   }
   if (BLOCK.has(e.code)) e.preventDefault();
@@ -222,6 +238,7 @@ const tap  = l => l.some(k => pressed[k]);
 //       'guest' = this browser sends inputs and draws what the host sends, plays P2
 let mode = 'local', myIndex = 0, lobby = 'none';
 let peer = null, conn = null, snapAcc = 0, lastHeldSent = '';
+let guests = [], roster = [], roomCode = '';
 const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'swap', 'build', 'med', 'strike'];
 let netHeld = {}, netTaps = {};
 const decalQueue = [];
@@ -230,12 +247,12 @@ const anyKeys = a => CTRL[0][a].concat(CTRL[1][a]);
 function inHeld(i, a) {
   if (mode === 'local') return held(CTRL[i][a]);
   if (i === myIndex) return held(anyKeys(a));
-  return !!netHeld[a];
+  return !!(netHeld[i] && netHeld[i][a]);
 }
 function inTap(i, a) {
   if (mode === 'local') return tap(CTRL[i][a]);
   if (i === myIndex) return tap(anyKeys(a));
-  return !!netTaps[a];
+  return !!(netTaps[i] && netTaps[i][a]);
 }
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -322,7 +339,7 @@ function resetGround() {
   }
 }
 function splat(x, y, size, color) {
-  if (mode === 'host' && conn && decalQueue.length < 200) decalQueue.push([0, Math.round(x), Math.round(y), size, color]);
+  if (mode === 'host' && guests.length && decalQueue.length < 200) decalQueue.push([0, Math.round(x), Math.round(y), size, color]);
   g.fillStyle = color;
   for (let i = 0; i < 7; i++) {
     const s = rand(size * 0.2, size * 0.6);
@@ -344,19 +361,20 @@ let players = [], zombies = [], bullets = [], eshots = [], barricades = [], pudd
 let barrels = [], particles = [], pickups = [], loot = [], texts = [], banners = [], beams = [], bolts = [];
 let toSpawn = 0, spawnT = 0, intermission = 0, bossPending = false, bossDelay = 0;
 let clearT = 0, activeMods = new Set(), nextMods = [], teamEnergy = 0, strikes = [], meds = [];
-let eliteAt = -1, boomDepth = 0;
+let eliteAt = new Set(), boomDepth = 0;
 let camX = WW / 2, camY = WH / 2, zoom = ZMIN;
 let mastery = {};
 let best = 0;
 try { best = +localStorage.getItem('blockrot-best') || 0; } catch (e) {}
 
-function newPlayer(i) {
-  return { i, x: i ? 1280 : 1120, y: 1100, r: 14, hp: 100, dx: 0, dy: -1, speed: 200,
+function newPlayer(i, name) {
+  const [sx, sy] = SPAWNS[i % SPAWNS.length], [body, head] = PLAYER_COLORS[i % PLAYER_COLORS.length];
+  return { i, x: sx, y: sy, r: 14, gone: false, hp: 100, dx: 0, dy: -1, speed: 200,
     slots: [], cur: 0, cd: 0, alive: true, build: 2, score: 0, combo: 0, comboT: 0,
     hurt: 0, rev: 0, walk: 0, chain: {}, chainT: {},
     cash: 0, up: { armor:0, speed:0, medic:0, kit:0, fort:0, cool:0, magnet:0 },
     medCd: 0, strikeT: -9, sel: 0, ready: false, msg: '', msgT: 0,
-    body: i ? '#2f8fa0' : '#c98a1e', head: i ? '#5fc6d6' : '#f2b134', name: i ? 'P2' : 'P1' };
+    body, head, name: name || 'P' + (i + 1) };
 }
 
 function makeSlot(id, rarity = 'base') {
@@ -374,6 +392,10 @@ function maxAmmo(s) {
   return Math.round(m);
 }
 const maxHp = p => 100 + 20 * p.up.armor;
+const teamSize = () => players.filter(p => !p.gone).length || 1;
+const crowd = () => 1 + .35 * Math.max(0, teamSize() - 2);
+const masteryNeed = lv => Math.round(MASTERY_NEED[lv] * Math.max(1, teamSize() / 2));
+const energyMax = () => Math.round(ENERGY_MAX * Math.max(1, teamSize() / 2));
 const buildCap = p => 6 + 2 * p.up.kit;
 const cashMul = p => (1 + .1 * p.up.magnet) * (activeMods.has('loot') ? 1.5 : 1)
   * (activeMods.has('armored') ? 1.5 : 1) * (activeMods.has('scarce') ? 1.3 : 1);
@@ -400,14 +422,23 @@ function startGame() {
   state = 'play'; wave = 0; time = 0;
   mastery = {};
   for (const id in W_DEFS) mastery[id] = { lv: 0 };
-  players = [newPlayer(0), newPlayer(1)];
+  if (mode === 'host') {
+    // renumber everyone 0..n-1 so there are no gaps from people who left the lobby
+    guests.sort((a, b) => a.idx - b.idx);
+    guests.forEach((gst, k) => { gst.idx = k + 1; });
+    const hostName = (roster.find(r => r.idx === 0) || {}).name || 'P1';
+    roster = [{ idx: 0, name: hostName }].concat(guests.map(gst => ({ idx: gst.idx, name: gst.name })));
+    netHeld = {}; netTaps = {};
+    for (const gst of guests) sendTo(gst.conn, { t: 'welcome', idx: gst.idx, code: roomCode });
+    players = roster.map(r => newPlayer(r.idx, r.name));
+  } else players = [newPlayer(0), newPlayer(1)];
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
   bossPending = false; clearT = 0; activeMods = new Set(); nextMods = [];
   teamEnergy = 0; strikes = []; meds = [];
   resetGround(); nextWave();
   updateCam(0, true);
-  if (mode === 'host') { send({ t: 'start' }); snapAcc = 1; }
+  if (mode === 'host') { send({ t: 'start' }); snapAcc = 1; lobbyText(); }
 }
 
 function nextWave() {
@@ -416,18 +447,16 @@ function nextWave() {
   activeMods = new Set(nextMods); nextMods = [];
   toSpawn = boss ? 6 + wave * 2 : 8 + wave * 5;
   if (activeMods.has('swarm')) toSpawn = Math.round(toSpawn * 1.5);
-  eliteAt = (!boss && wave >= ELITE_FROM) ? Math.floor(toSpawn / 2) : -1;
+  toSpawn = Math.round(toSpawn * crowd());
+  const nElite = (!boss && wave >= ELITE_FROM) ? Math.ceil(teamSize() / 2) : 0;
+  eliteAt = new Set(Array.from({ length: nElite }, (_, k) => Math.floor(toSpawn * (k + 1) / (nElite + 1))));
   spawnT = 1.2; intermission = 0;
   for (const p of players) {
+    if (p.gone) continue;
     if (!p.alive) { p.alive = true; p.hp = 50; p.hurt = 1; }
     else p.hp = Math.min(maxHp(p), p.hp + 25);
     p.build = Math.min(buildCap(p), p.build + 2);
-    const baseCount = p.slots.filter(s => s.rarity === 'base').length;
-    let ins = baseCount;
-    for (const id in W_DEFS) {
-      if (W_DEFS[id].unlock <= wave && !p.slots.some(s => s.rarity === 'base' && s.id === id))
-        p.slots.splice(ins++, 0, makeSlot(id));
-    }
+    grantWeapons(p);
     for (const s of p.slots) {
       if (s.rarity === 'base') s.ammo = s.max;
       else s.ammo = Math.min(s.max, s.ammo + Math.ceil(s.max / 2));
@@ -446,6 +475,13 @@ function nextWave() {
   }
 }
 
+function grantWeapons(p) {
+  let ins = p.slots.filter(s => s.rarity === 'base').length;
+  for (const id in W_DEFS) {
+    if (W_DEFS[id].unlock <= wave && !p.slots.some(s => s.rarity === 'base' && s.id === id))
+      p.slots.splice(ins++, 0, makeSlot(id));
+  }
+}
 function farGate() {
   const far = GATES.filter(gt => players.every(p => dist(p, gt) > 650));
   return pick(far.length ? far : GATES);
@@ -469,7 +505,7 @@ function spawnZombie() {
   for (const k of pool) { r -= wt(k); if (r <= 0) { type = k; break; } }
   const gt = farGate();
   const z = makeZombie(type, gt.x + (gt.jx ? rand(-60, 60) : 0), gt.y + (gt.jy ? rand(-60, 60) : 0), false);
-  if (toSpawn === eliteAt) {
+  if (eliteAt.has(toSpawn)) {
     z.elite = true; z.hp *= 4; z.max *= 4; z.r = Math.round(z.r * 1.25); z.pts *= 5;
     banner('An elite ' + type + ' appeared. It carries a weapon mod', '#f2d27a');
   }
@@ -478,7 +514,7 @@ function spawnZombie() {
 function spawnBoss() {
   const idx = wave / BOSS_EVERY - 1, B = BOSSES[idx % BOSSES.length];
   const gt = farGate();
-  const hp = B.hp * (1 + wave * .08) * (1 + idx * .35);
+  const hp = B.hp * (1 + wave * .08) * (1 + idx * .35) * crowd();
   zombies.push({
     id: nextId++, type: 'boss', key: B.key, boss: true, name: B.name, x: gt.x, y: gt.y, r: B.r,
     hp, max: hp, speed: B.speed, dmg: B.dmg, body: B.body, head: B.head, pts: 1000,
@@ -710,7 +746,7 @@ function advanceChain(q, id) {
   if (m.lv >= 3) return;
   q.chain[id] = (q.chain[id] || 0) + 1;
   q.chainT[id] = CHAIN_WINDOW;
-  if (q.chain[id] < MASTERY_NEED[m.lv]) return;
+  if (q.chain[id] < masteryNeed(m.lv)) return;
   m.lv++;
   for (const o of players) { o.chain[id] = 0; o.chainT[id] = 0; }
   banner(`${q.name} mastered the ${W_DEFS[id].name}! Team perk ${'I'.repeat(m.lv)}: ${MASTERY_PERKS[m.lv - 1]}`, '#f2d27a', true);
@@ -723,7 +759,7 @@ function advanceChain(q, id) {
 function kill(z, owner, slot) {
   if (z.dead) return;
   z.dead = true;
-  teamEnergy = Math.min(ENERGY_MAX, teamEnergy + (z.boss ? 30 : z.elite ? 5 : 1));
+  teamEnergy = Math.min(energyMax(), teamEnergy + (z.boss ? 30 : z.elite ? 5 : 1));
   if (owner) {
     for (const q of players) {
       if (q !== owner && !(SHARE_COMBO && q.alive)) continue;
@@ -734,9 +770,10 @@ function kill(z, owner, slot) {
     owner.cash += Math.round(pts * CASH_RATE * cashMul(owner));
     floatText(z.x, z.y - 24, '+' + pts, owner.head);
     if (slot && slot.base) advanceChain(owner, slot.base);
-    if (SHARE_CHAIN) {
-      const mate = players[1 - owner.i], ms = mate.slots[mate.cur];
-      if (mate.alive && ms && ms.base) advanceChain(mate, ms.base);
+    if (SHARE_CHAIN) for (const q of players) {
+      if (q === owner || !q.alive) continue;
+      const qs = q.slots[q.cur];
+      if (qs && qs.base) advanceChain(q, qs.base);
     }
   }
   splat(z.x, z.y, z.r, 'rgba(110,22,18,.55)');
@@ -766,7 +803,7 @@ function explode(x, y, rad, dmg, owner, slot, hurtPlayers = 0) {
   if (hurtPlayers) for (const p of players) if (p.alive && Math.hypot(p.x - x, p.y - y) < rad) hurt(p, hurtPlayers);
   g.fillStyle = 'rgba(0,0,0,.3)';
   g.beginPath(); g.arc(x, y, rad * .45, 0, 6.283); g.fill();
-  if (mode === 'host' && conn && decalQueue.length < 200) decalQueue.push([1, Math.round(x), Math.round(y), rad]);
+  if (mode === 'host' && guests.length && decalQueue.length < 200) decalQueue.push([1, Math.round(x), Math.round(y), rad]);
   for (const z of zombies) {
     const d = Math.hypot(z.x - x, z.y - y);
     if (d < rad + z.r) damage(z, dmg * (1 - .5 * Math.min(1, d / rad)), owner, slot, z.x - x, z.y - y, true);
@@ -801,11 +838,15 @@ function bossDeath(z) {
   shake = 20;
   banner(z.name + ' defeated. Grab the loot: whoever touches an item keeps it', '#ff9f1a', true);
   const idx = wave / BOSS_EVERY - 1;
-  const items = [rollRare(), Math.random() < .35 + idx * .2 ? rollLegendary() : rollRare()];
+  const n = teamSize();
+  const items = [rollRare()];
+  while (items.length < Math.max(2, n)) items.push(Math.random() < .35 + idx * .2 ? rollLegendary() : rollRare());
   if (idx === 1 && !items.some(i => i.rarity === 'legendary')) items[1] = rollLegendary();
-  items.push(rollMod());
+  for (let k = 0; k < Math.max(1, Math.ceil(n / 2)); k++) items.push(rollMod());
+  const ringR = 50 + items.length * 7;
   items.forEach((it, k) => {
-    const l = { x: z.x + (k - 1) * 60, y: z.y + (k === 2 ? 40 : 0), r: 12, item: it, bob: rand(0, 6) };
+    const a = k / items.length * 6.283 - 1.571;
+    const l = { x: z.x + Math.cos(a) * ringR, y: z.y + Math.sin(a) * ringR, r: 12, item: it, bob: rand(0, 6) };
     l.x = clamp(l.x, 30, WW - 30); l.y = clamp(l.y, 30, WH - 30);
     solid(l);
     loot.push(l);
@@ -825,28 +866,42 @@ function eShot(x, y, a, speed, kind) {
 
 /* ---------------- team abilities ---------------- */
 function throwMedkit(p) {
-  const mate = players[1 - p.i];
   if (p.medCd > 0) { floatText(p.x, p.y - 34, `Medkit in ${Math.ceil(p.medCd)}s`, '#8f8870'); return; }
-  if (mate.alive && mate.hp >= maxHp(mate)) { floatText(p.x, p.y - 34, 'Partner is at full health', '#8f8870'); return; }
+  const range = mode === 'local' ? Infinity : 900;
+  const allies = players.filter(q => q !== p && !q.gone && dist(q, p) < range);
+  const downed = allies.filter(q => !q.alive).sort((a, b) => dist(a, p) - dist(b, p))[0];
+  const hurtAlly = allies.filter(q => q.alive && q.hp < maxHp(q)).sort((a, b) => a.hp / maxHp(a) - b.hp / maxHp(b))[0];
+  const target = downed || hurtAlly;
+  if (!target) {
+    floatText(p.x, p.y - 34, mode === 'local' ? 'Partner is at full health' : 'No hurt teammate nearby', '#8f8870');
+    return;
+  }
   p.medCd = MEDKIT_CD * (1 - .15 * p.up.cool);
-  meds.push({ from: p, to: mate, x: p.x, y: p.y, sx: p.x, sy: p.y, t: 0, dur: .55 });
+  meds.push({ from: p, to: target, x: p.x, y: p.y, sx: p.x, sy: p.y, t: 0, dur: .55 });
 }
 function tryStrike(p) {
-  const mate = players[1 - p.i];
   p.strikeT = time;
-  if (teamEnergy < ENERGY_MAX) { floatText(p.x, p.y - 34, `Airstrike ${Math.floor(teamEnergy / ENERGY_MAX * 100)}% charged`, '#8f8870'); return; }
-  if (!mate.alive) { floatText(p.x, p.y - 34, 'Needs both players standing', '#e2735f'); return; }
-  if (time - mate.strikeT > STRIKE_WINDOW) { floatText(p.x, p.y - 34, 'Waiting for partner...', '#f2d27a'); return; }
-  teamEnergy = 0; p.strikeT = mate.strikeT = -9;
-  banner('Airstrike inbound', '#ff9a3c', true);
-  const vw = W / zoom / 2, vh = (H - AY) / zoom / 2;
-  const inView = zombies.filter(z => Math.abs(z.x - camX) < vw && Math.abs(z.y - camY) < vh);
+  if (teamEnergy < energyMax()) { floatText(p.x, p.y - 34, `Airstrike ${Math.floor(teamEnergy / energyMax() * 100)}% charged`, '#8f8870'); return; }
+  const alive = players.filter(q => q.alive);
+  const pressing = alive.filter(q => time - q.strikeT <= STRIKE_WINDOW);
+  if (pressing.length < Math.min(2, alive.length)) {
+    floatText(p.x, p.y - 34, mode === 'local' ? 'Waiting for partner...' : 'Waiting for a teammate to press too...', '#f2d27a');
+    return;
+  }
+  teamEnergy = 0;
+  for (const q of players) q.strikeT = -9;
+  banner(`Airstrike inbound (called by ${pressing.map(q => q.name).join(' + ')})`, '#ff9a3c', true);
+  // bomb around the players who called it
+  const cx = pressing.reduce((a, q) => a + q.x, 0) / pressing.length;
+  const cy = pressing.reduce((a, q) => a + q.y, 0) / pressing.length;
+  const vw = 750, vh = 480;
+  const inView = zombies.filter(z => Math.abs(z.x - cx) < vw && Math.abs(z.y - cy) < vh);
   inView.sort((a, b) => b.max - a.max);
   for (let k = 0; k < 16; k++) {
     const tg = inView.length ? inView[k % inView.length] : null;
-    const x = tg ? tg.x + rand(-40, 40) : camX + rand(-vw, vw) * .8;
-    const y = tg ? tg.y + rand(-40, 40) : camY + rand(-vh, vh) * .8;
-    strikes.push({ x, y, t: .6 + k * .1, max: .6 + k * .1, owner: players[k % 2] });
+    const x = tg ? tg.x + rand(-40, 40) : cx + rand(-vw, vw) * .8;
+    const y = tg ? tg.y + rand(-40, 40) : cy + rand(-vh, vh) * .8;
+    strikes.push({ x, y, t: .6 + k * .1, max: .6 + k * .1, owner: pressing[k % pressing.length] });
   }
 }
 
@@ -860,6 +915,7 @@ function openShop() {
     while (nextMods.length < n) { const m = pick(pool); if (!nextMods.includes(m)) nextMods.push(m); }
   }
   for (const p of players) {
+    if (p.gone) continue;
     p.ready = false; p.msg = ''; p.sel = 0;
     if (!p.alive) { p.alive = true; p.hp = Math.round(maxHp(p) / 2); p.hurt = 1; }
   }
@@ -885,6 +941,7 @@ function buy(p, item) {
 }
 function shopInput(dt) {
   for (const p of players) {
+    if (p.gone) continue;
     if (p.msgT > 0) p.msgT -= dt;
     if (p.ready) { if (inTap(p.i, 'build') || inTap(p.i, 'fire')) p.ready = false; continue; }
     if (inTap(p.i, 'up')) p.sel = (p.sel + SHOP.length - 1) % SHOP.length;
@@ -892,7 +949,7 @@ function shopInput(dt) {
     if (inTap(p.i, 'fire')) buy(p, SHOP[p.sel]);
     else if (inTap(p.i, 'build')) p.ready = true;
   }
-  if (players.every(p => p.ready)) {
+  if (players.every(p => p.ready || p.gone)) {
     state = 'play'; intermission = 3;
     banner('Get ready', '#e6dfc8');
   }
@@ -900,10 +957,17 @@ function shopInput(dt) {
 
 /* ---------------- camera ---------------- */
 function updateCam(dt, snap) {
-  const [a, b] = players;
-  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-  const need = Math.max(Math.abs(a.x - b.x) / (W - 240), Math.abs(a.y - b.y) / (H - AY - 200), 1e-6);
-  const tz = clamp(1 / need, ZMIN, 1);
+  let mx, my, tz;
+  if (mode === 'local') {
+    const [a, b] = players;
+    mx = (a.x + b.x) / 2; my = (a.y + b.y) / 2;
+    const need = Math.max(Math.abs(a.x - b.x) / (W - 240), Math.abs(a.y - b.y) / (H - AY - 200), 1e-6);
+    tz = clamp(1 / need, ZMIN, 1);
+  } else {
+    const me = players[myIndex];
+    if (!me) return;
+    mx = me.x; my = me.y; tz = ONLINE_ZOOM;
+  }
   zoom = snap ? tz : zoom + (tz - zoom) * Math.min(1, dt * 4);
   const vw = W / zoom, vh = (H - AY) / zoom;
   const tx = clamp(mx, vw / 2, WW - vw / 2), ty = clamp(my, vh / 2, WH - vh / 2);
@@ -926,11 +990,12 @@ function update(dt) {
 
   // players
   for (const p of players) {
+    if (p.gone) continue;
     if (!p.alive) {
-      const mate = players[1 - p.i];
-      if (mate.alive && dist(p, mate) < 50) {
-        p.rev += dt;
-        if (p.rev >= 3 - .6 * mate.up.medic) { p.alive = true; p.hp = 40; p.rev = 0; p.hurt = 1; banner(p.name + ' is back up', '#8fd67a'); }
+      const helpers = players.filter(q => q.alive && q !== p && dist(p, q) < 50);
+      if (helpers.length) {
+        p.rev += dt * (1 + .5 * (helpers.length - 1));
+        if (p.rev >= 3 - .6 * Math.max(...helpers.map(q => q.up.medic))) { p.alive = true; p.hp = 40; p.rev = 0; p.hurt = 1; banner(p.name + ' is back up', '#8fd67a'); }
       } else p.rev = Math.max(0, p.rev - dt);
       continue;
     }
@@ -942,9 +1007,11 @@ function update(dt) {
     }
     const spd = p.speed * (1 + .08 * p.up.speed);
     p.x += mx * spd * dt; p.y += my * spd * dt;
-    const mate = players[1 - p.i];
-    p.x = clamp(p.x, mate.x - MAXDX, mate.x + MAXDX);
-    p.y = clamp(p.y, mate.y - MAXDY, mate.y + MAXDY);
+    if (mode === 'local') {
+      const mate = players[1 - p.i];
+      p.x = clamp(p.x, mate.x - MAXDX, mate.x + MAXDX);
+      p.y = clamp(p.y, mate.y - MAXDY, mate.y + MAXDY);
+    }
     solid(p);
     if (inTap(p.i, 'swap')) switchNext(p);
     p.cd -= dt;
@@ -1213,6 +1280,7 @@ function update(dt) {
     m.x = m.sx + (m.to.x - m.sx) * k; m.y = m.sy + (m.to.y - m.sy) * k - Math.sin(k * Math.PI) * 60;
     if (k >= 1) {
       m.done = true;
+      if (m.to.gone) continue;
       const heal = 35 + 10 * m.from.up.medic;
       if (!m.to.alive) {
         m.to.alive = true; m.to.hp = heal; m.to.rev = 0; m.to.hurt = 1;
@@ -1238,9 +1306,9 @@ function update(dt) {
       if (bossPending) { bossDelay -= dt; if (bossDelay <= 0) { bossPending = false; spawnBoss(); } }
       if (toSpawn > 0) {
         spawnT -= dt;
-        if (spawnT <= 0 && zombies.length < 40) {
+        if (spawnT <= 0 && zombies.length < Math.min(90, 40 + 6 * (teamSize() - 2))) {
           spawnZombie(); toSpawn--;
-          spawnT = Math.max(.2, 1 - wave * .05) * rand(.5, 1.3);
+          spawnT = Math.max(.2, 1 - wave * .05) * rand(.5, 1.3) / Math.sqrt(crowd());
         }
       } else if (!bossPending && zombies.length === 0) {
         clearT = wave % BOSS_EVERY === 0 ? 6 : 2.5;
@@ -1301,6 +1369,7 @@ function drawBlock(x, y, s, body, head, dx, dy, walk, flash, arms, eye) {
 }
 
 function drawPlayer(p) {
+  if (!p.slots.length) return;
   if (!p.alive) {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(p.x - 17, p.y - 2, 34, 12);
     ctx.fillStyle = '#6b665a'; ctx.fillRect(p.x - 16, p.y - 8, 32, 14);
@@ -1457,7 +1526,7 @@ function drawWorld() {
   }
 
   const actors = [];
-  for (const p of players) actors.push({ y: p.alive ? p.y : p.y - 100, d: () => drawPlayer(p) });
+  for (const p of players) if (!p.gone) actors.push({ y: p.alive ? p.y : p.y - 100, d: () => drawPlayer(p) });
   for (const z of zombies) if (vis(z) || z.boss) actors.push({ y: z.y, d: () => drawZombie(z) });
   actors.sort((a, b) => a.y - b.y).forEach(a => a.d());
 
@@ -1538,6 +1607,7 @@ function drawFog() {
   fg.fillStyle = 'rgba(8,8,12,.93)'; fg.fillRect(0, 0, W, H);
   fg.globalCompositeOperation = 'destination-out';
   for (const p of players) {
+    if (p.gone) continue;
     const sx = W / 2 + (p.x - camX) * zoom, sy = AY + (H - AY) / 2 + (p.y - camY) * zoom, r = 300 * zoom;
     const gr = fg.createRadialGradient(sx, sy, r * .35, sx, sy, r);
     gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1558,41 +1628,111 @@ function pips(x, y, lv, align) {
   return width;
 }
 
+function drawPlayerBlock(p, left) {
+  const x0 = left ? 14 : W - 14;
+  ctx.textAlign = left ? 'left' : 'right';
+  ctx.font = `bold 16px ${FONT}`; ctx.fillStyle = p.head;
+  ctx.fillText(p.name, x0, 20);
+  const nmW = Math.max(28, ctx.measureText(p.name).width + 8);
+  const bx = left ? x0 + nmW : x0 - nmW - 150;
+  ctx.fillStyle = '#2e2c24'; ctx.fillRect(bx, 8, 150, 13);
+  const fw = 150 * clamp(p.hp / maxHp(p), 0, 1);
+  ctx.fillStyle = p.hp > maxHp(p) * .35 ? '#6bbf4a' : '#d0402f';
+  ctx.fillRect(left ? bx : bx + 150 - fw, 8, fw, 13);
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(bx, 8, 150, 13);
+  const scoreTxt = `${p.score}${p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''}`;
+  ctx.font = `bold 15px ${FONT}`;
+  ctx.fillStyle = p.combo > 1 ? '#f2d27a' : '#e6dfc8';
+  ctx.fillText(scoreTxt, left ? bx + 162 : bx - 12, 20);
+  const scoreW = ctx.measureText(scoreTxt).width + 16;
+  ctx.font = `bold 14px ${FONT}`; ctx.fillStyle = '#8fd67a';
+  ctx.fillText('$' + p.cash, left ? bx + 162 + scoreW : bx - 12 - scoreW, 20);
+
+  const s = p.slots[p.cur];
+  if (!s) return;
+  const am = s.ammo === Infinity ? '∞' : s.ammo;
+  const lv = s.base ? mastery[s.base].lv : 0;
+  const nameTxt = `${s.name}${s.mod ? ' + ' + MODS[s.mod].name : ''} ${am}`;
+  const tail = `   Barricades ${p.build}/${buildCap(p)}   Medkit ${p.medCd > 0 ? Math.ceil(p.medCd) + 's' : 'ready'}`;
+  ctx.font = `13px ${FONT}`; const tailW = ctx.measureText(tail).width;
+  ctx.font = `bold 14px ${FONT}`; const nameW = ctx.measureText(nameTxt).width;
+  const pw = s.base ? 45 : 0;
+  let cx = left ? x0 : x0 - (nameW + pw + tailW);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = s.mod ? MODS[s.mod].color : RARITY_COLOR[s.rarity]; ctx.fillText(nameTxt, cx, 42); cx += nameW + 6;
+  if (s.base) { pips(cx, 42, lv, 'left'); cx += 39; }
+  ctx.font = `13px ${FONT}`; ctx.fillStyle = '#8f8870'; ctx.fillText(tail, cx, 42);
+}
+
+function drawChainBar(p, left) {
+  const sl = p.slots[p.cur];
+  if (!p.alive || !sl || !sl.base) return;
+  const id = sl.base, m = mastery[id];
+  const bx = left ? 10 : W - 260;
+  ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(bx, AY + 8, 250, 26);
+  ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = p.head;
+  if (m.lv >= 3) { ctx.fillText(`${W_DEFS[id].name} fully mastered`, bx + 10, AY + 25); return; }
+  const need = masteryNeed(m.lv), c = p.chain[id] || 0;
+  ctx.fillText(`${W_DEFS[id].name} chain`, bx + 10, AY + 25);
+  const barX = bx + 120, barW = 80;
+  ctx.fillStyle = '#3a372c'; ctx.fillRect(barX, AY + 16, barW, 10);
+  const tFrac = Math.max(0, (p.chainT[id] || 0) / CHAIN_WINDOW);
+  ctx.fillStyle = '#f2d27a'; ctx.fillRect(barX, AY + 16, barW * Math.min(1, c / need), 10);
+  ctx.fillStyle = 'rgba(242,210,122,.45)'; ctx.fillRect(barX, AY + 28, barW * tFrac, 2);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#e6dfc8'; ctx.font = `12px ${FONT}`;
+  ctx.fillText(`${c}/${need}`, bx + 242, AY + 25);
+}
+
+function drawTeamPanel(me) {
+  const list = players.filter(q => !q.gone && q !== me);
+  if (!list.length) return;
+  const px = W - 230, py = AY + 8, rh = 20;
+  ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(px, py, 220, 12 + list.length * rh);
+  list.forEach((q, i) => {
+    const yy = py + 20 + i * rh;
+    ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = q.head;
+    ctx.fillText(q.name, px + 10, yy);
+    if (q.alive) {
+      ctx.fillStyle = '#2e2c24'; ctx.fillRect(px + 105, yy - 9, 60, 9);
+      ctx.fillStyle = q.hp > maxHp(q) * .35 ? '#6bbf4a' : '#d0402f';
+      ctx.fillRect(px + 105, yy - 9, 60 * clamp(q.hp / maxHp(q), 0, 1), 9);
+    } else {
+      ctx.fillStyle = '#e2735f'; ctx.fillText('DOWN', px + 110, yy);
+    }
+    ctx.textAlign = 'right'; ctx.font = `12px ${FONT}`; ctx.fillStyle = '#a9a28a';
+    ctx.fillText(q.score, px + 212, yy);
+  });
+}
+
+function drawEdgeMarkers(me) {
+  for (const q of players) {
+    if (q.gone || q === me) continue;
+    const sx = W / 2 + (q.x - camX) * zoom, sy = AY + (H - AY) / 2 + (q.y - camY) * zoom;
+    if (sx > 0 && sx < W && sy > AY && sy < H) continue;
+    const ex = clamp(sx, 24, W - 24), ey = clamp(sy, AY + 24, H - 24);
+    const a = Math.atan2(sy - ey, sx - ex);
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+    ctx.fillStyle = q.alive ? q.head : '#e2735f';
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-6, -8); ctx.lineTo(-6, 8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+    ctx.textAlign = 'center'; ctx.font = `bold 11px ${FONT}`;
+    ctx.fillStyle = q.alive ? q.head : '#e2735f';
+    ctx.fillText(q.alive ? q.name : q.name + ' (down)', ex - Math.cos(a) * 22, ey - Math.sin(a) * 18 + 4);
+  }
+}
+
 function drawHud() {
   ctx.fillStyle = '#12110c'; ctx.fillRect(0, 0, W, AY);
   ctx.fillStyle = '#000'; ctx.fillRect(0, AY - 2, W, 2);
-  for (const p of players) {
-    const left = p.i === 0, x0 = left ? 14 : W - 14, al = left ? 'left' : 'right';
-    ctx.textAlign = al;
-    ctx.font = `bold 16px ${FONT}`; ctx.fillStyle = p.head;
-    ctx.fillText(p.name, x0, 20);
-    const bx = left ? x0 + 32 : x0 - 32 - 150;
-    ctx.fillStyle = '#2e2c24'; ctx.fillRect(bx, 8, 150, 13);
-    const fw = 150 * clamp(p.hp / maxHp(p), 0, 1);
-    ctx.fillStyle = p.hp > maxHp(p) * .35 ? '#6bbf4a' : '#d0402f';
-    ctx.fillRect(left ? bx : bx + 150 - fw, 8, fw, 13);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(bx, 8, 150, 13);
-    ctx.font = `bold 15px ${FONT}`;
-    ctx.fillStyle = p.combo > 1 ? '#f2d27a' : '#e6dfc8';
-    ctx.fillText(`${p.score}${p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''}`, left ? bx + 162 : bx - 12, 20);
-    ctx.font = `bold 14px ${FONT}`; ctx.fillStyle = '#8fd67a';
-    const scoreW = ctx.measureText(`${p.score}${p.combo > 1 ? '  x' + Math.min(p.combo, 10) : ''}`).width + 16;
-    ctx.fillText('$' + p.cash, left ? bx + 162 + scoreW : bx - 12 - scoreW, 20);
-
-    const s = p.slots[p.cur];
-    const am = s.ammo === Infinity ? '∞' : s.ammo;
-    const lv = s.base ? mastery[s.base].lv : 0;
-    ctx.font = `bold 14px ${FONT}`;
-    const nameTxt = `${s.name}${s.mod ? ' + ' + MODS[s.mod].name : ''} ${am}`;
-    const tail = `   Barricades ${p.build}/${buildCap(p)}   Medkit ${p.medCd > 0 ? Math.ceil(p.medCd) + 's' : 'ready'}`;
-    ctx.font = `13px ${FONT}`; const tailW = ctx.measureText(tail).width;
-    ctx.font = `bold 14px ${FONT}`; const nameW = ctx.measureText(nameTxt).width;
-    const pw = s.base ? 45 : 0;
-    let cx = left ? x0 : x0 - (nameW + pw + tailW);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = s.mod ? MODS[s.mod].color : RARITY_COLOR[s.rarity]; ctx.fillText(nameTxt, cx, 42); cx += nameW + 6;
-    if (s.base) { pips(cx, 42, lv, 'left'); cx += 39; }
-    ctx.font = `13px ${FONT}`; ctx.fillStyle = '#8f8870'; ctx.fillText(tail, cx, 42);
+  const me = players[myIndex];
+  if (mode === 'local') { drawPlayerBlock(players[0], true); drawPlayerBlock(players[1], false); }
+  else {
+    drawPlayerBlock(me, true);
+    ctx.textAlign = 'right'; ctx.font = `bold 14px ${FONT}`; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText(`Squad of ${teamSize()}`, W - 14, 20);
+    ctx.font = `12px ${FONT}`; ctx.fillStyle = '#8f8870';
+    ctx.fillText(roomCode ? `Room ${roomCode}` : '', W - 14, 40);
   }
   ctx.textAlign = 'center';
   ctx.font = `bold 18px ${FONT}`; ctx.fillStyle = '#e6dfc8';
@@ -1601,35 +1741,20 @@ function drawHud() {
   ctx.fillText(clearT > 0 ? 'Wave cleared' : intermission > 0 ? 'Next wave in ' + Math.ceil(intermission) : (zombies.length + toSpawn) + ' enemies left', W / 2, 42);
 
   let y = AY + 8;
-  for (const p of players) {
-    const sl = p.slots[p.cur];
-    if (!p.alive || !sl.base) continue;
-    const id = sl.base, m = mastery[id], left = p.i === 0;
-    const bx = left ? 10 : W - 260;
-    ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(bx, AY + 8, 250, 26);
-    ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = p.head;
-    if (m.lv >= 3) { ctx.fillText(`${W_DEFS[id].name} fully mastered`, bx + 10, AY + 25); continue; }
-    const need = MASTERY_NEED[m.lv], c = p.chain[id] || 0;
-    ctx.fillText(`${W_DEFS[id].name} chain`, bx + 10, AY + 25);
-    const barX = bx + 120, barW = 80;
-    ctx.fillStyle = '#3a372c'; ctx.fillRect(barX, AY + 16, barW, 10);
-    const tFrac = Math.max(0, (p.chainT[id] || 0) / CHAIN_WINDOW);
-    ctx.fillStyle = '#f2d27a'; ctx.fillRect(barX, AY + 16, barW * c / need, 10);
-    ctx.fillStyle = 'rgba(242,210,122,.45)'; ctx.fillRect(barX, AY + 28, barW * tFrac, 2);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#e6dfc8'; ctx.font = `12px ${FONT}`;
-    ctx.fillText(`${c}/${need}`, bx + 242, AY + 25);
-  }
+  if (mode === 'local') { drawChainBar(players[0], true); drawChainBar(players[1], false); }
+  else { drawChainBar(me, true); drawTeamPanel(me); drawEdgeMarkers(me); }
   {
-    const pw = 380, px = W / 2 - pw / 2, full = teamEnergy >= ENERGY_MAX;
+    const pw = 380, px = W / 2 - pw / 2, full = teamEnergy >= energyMax();
     const modTxt = [...activeMods].map(m => MODIFIERS[m].name).join('  ·  ');
     const ph = modTxt ? 46 : 26;
     ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(px, AY + 8, pw, ph);
     ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`;
     ctx.fillStyle = full ? (Math.floor(time * 4) % 2 ? '#ff9a3c' : '#ffd27a') : '#8f8870';
-    ctx.fillText(full ? "Airstrike ready: P1 G + P2 ' together" : 'Airstrike', px + 10, AY + 25);
+    const readyTxt = mode === 'local' ? "Airstrike ready: P1 G + P2 ' together" : "Airstrike ready: any 2 players press G or ' together";
+    ctx.fillText(full ? readyTxt : 'Airstrike', px + 10, AY + 25);
     if (!full) {
       ctx.fillStyle = '#3a372c'; ctx.fillRect(px + 90, AY + 16, 270, 10);
-      ctx.fillStyle = '#ff9a3c'; ctx.fillRect(px + 90, AY + 16, 270 * teamEnergy / ENERGY_MAX, 10);
+      ctx.fillStyle = '#ff9a3c'; ctx.fillRect(px + 90, AY + 16, 270 * teamEnergy / energyMax(), 10);
     }
     if (modTxt) {
       ctx.textAlign = 'center'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = '#c9a0ff';
@@ -1680,16 +1805,18 @@ function drawHud() {
   for (const z of zombies) {
     if (activeMods.has('fog') && !z.boss && zombies.length + toSpawn > 5) continue;
     ctx.fillStyle = z.boss ? '#ff4a3a' : '#b8322a';
-    const s = z.boss ? 6 : 2;
-    ctx.fillRect(mx + z.x * MMS - s / 2, my + z.y * MMS - s / 2, s, s);
+    const sz = z.boss ? 6 : 2;
+    ctx.fillRect(mx + z.x * MMS - sz / 2, my + z.y * MMS - sz / 2, sz, sz);
   }
   for (const l of loot) {
-    ctx.fillStyle = RARITY_COLOR[l.item.rarity];
+    ctx.fillStyle = l.item.kind === 'mod' ? MODS[l.item.id].color : RARITY_COLOR[l.item.rarity];
     ctx.fillRect(mx + l.x * MMS - 3, my + l.y * MMS - 3, 6, 6);
   }
   for (const p of players) {
+    if (p.gone) continue;
     ctx.fillStyle = p.alive ? p.head : '#6b665a';
-    ctx.fillRect(mx + p.x * MMS - 3, my + p.y * MMS - 3, 6, 6);
+    const sz = p === me && mode !== 'local' ? 8 : 6;
+    ctx.fillRect(mx + p.x * MMS - sz / 2, my + p.y * MMS - sz / 2, sz, sz);
   }
 }
 
@@ -1716,17 +1843,40 @@ function drawShop() {
   });
   else { ctx.fillStyle = '#8f8870'; ctx.fillText('No wave modifiers', W / 2, 132); }
 
-  const hints = mode === 'local'
-    ? ['W / S to choose, Space to buy, E when ready', 'Up / Down to choose, Enter to buy, / when ready']
-    : [0, 1].map(i => i === myIndex ? 'W/S or arrows to choose, Space or Enter to buy, E or / when ready'
-                                    : 'Your friend is shopping on their screen');
-  for (const p of players) {
-    const colW = 520, x0 = p.i === 0 ? 50 : W - 50 - colW, y0 = 180;
+  if (mode === 'local') {
+    drawShopColumn(players[0], 50, 'W / S to choose, Space to buy, E when ready');
+    drawShopColumn(players[1], W - 570, 'Up / Down to choose, Enter to buy, / when ready');
+  } else {
+    drawShopColumn(players[myIndex], 90, 'W/S or arrows to choose, Space or Enter to buy, E or / when ready');
+    const list = players.filter(q => !q.gone);
+    const px = 650, py = 180;
+    ctx.fillStyle = 'rgba(30,28,20,.95)'; ctx.fillRect(px, py, 460, 540);
+    ctx.strokeStyle = '#3a362a'; ctx.lineWidth = 2; ctx.strokeRect(px, py, 460, 540);
+    ctx.textAlign = 'left'; ctx.font = `bold 20px ${FONT}`; ctx.fillStyle = '#e6dfc8';
+    ctx.fillText(`Squad ready: ${list.filter(q => q.ready).length}/${list.length}`, px + 18, py + 34);
+    list.forEach((q, i) => {
+      const yy = py + 76 + i * 44;
+      ctx.font = `bold 17px ${FONT}`; ctx.fillStyle = q.head; ctx.textAlign = 'left';
+      ctx.fillText(q.name + (q.i === myIndex ? ' (you)' : ''), px + 18, yy);
+      ctx.textAlign = 'right'; ctx.font = `14px ${FONT}`;
+      ctx.fillStyle = q.ready ? '#8fd67a' : '#8f8870';
+      ctx.fillText(q.ready ? 'Ready' : 'Shopping...', px + 440, yy);
+      ctx.fillStyle = '#a9a28a';
+      ctx.fillText(`${q.score} pts`, px + 330, yy);
+    });
+  }
+}
+
+function drawShopColumn(p, x0, hint) {
+  if (!p) return;
+  const colW = 520, y0 = 180;
+  {
     ctx.fillStyle = 'rgba(30,28,20,.95)'; ctx.fillRect(x0, y0, colW, 540);
     ctx.strokeStyle = p.ready ? '#8fd67a' : p.head; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, colW, 540);
     ctx.textAlign = 'left'; ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = p.head;
     ctx.fillText(p.name, x0 + 18, y0 + 34);
-    ctx.fillStyle = '#8fd67a'; ctx.fillText('$' + p.cash, x0 + 70, y0 + 34);
+    const nw = ctx.measureText(p.name).width;
+    ctx.fillStyle = '#8fd67a'; ctx.fillText('$' + p.cash, x0 + 30 + nw, y0 + 34);
     ctx.textAlign = 'right'; ctx.font = `14px ${FONT}`; ctx.fillStyle = '#a9a28a';
     ctx.fillText(`Health ${Math.ceil(p.hp)}/${maxHp(p)}`, x0 + colW - 18, y0 + 32);
 
@@ -1751,11 +1901,11 @@ function drawShop() {
         ctx.fillText(maxed ? 'Maxed' : '$' + cost, x0 + colW - 22, ry + 22);
       }
     });
-    const sel = SHOP[p.sel];
+    const sel = SHOP[p.sel] || SHOP[0];
     ctx.textAlign = 'left'; ctx.font = `14px ${FONT}`; ctx.fillStyle = '#e6dfc8';
     ctx.fillText(p.ready ? 'Ready. Press fire or build to go back to shopping.' : sel.desc, x0 + 18, y0 + 452);
     ctx.fillStyle = p.msgT > 0 ? '#f2d27a' : '#8f8870';
-    ctx.fillText(p.msgT > 0 ? p.msg : hints[p.i], x0 + 18, y0 + 476);
+    ctx.fillText(p.msgT > 0 ? p.msg : hint, x0 + 18, y0 + 476);
     const s2 = p.slots.filter(sl => sl.mod).map(sl => `${sl.name}: ${MODS[sl.mod].name}`).join(',  ');
     ctx.fillStyle = '#a9a28a'; ctx.font = `12px ${FONT}`;
     ctx.fillText(s2 ? 'Mods: ' + s2 : 'No weapon mods yet. Elites and bosses drop them', x0 + 18, y0 + 504, colW - 36);
@@ -1793,13 +1943,14 @@ function drawTitle() {
   });
   const lines = [
     'You aim where you walk. Shoot red barrels. Stand next to a downed partner for 3 seconds to revive them.',
-    'Kills build both players\' combos. Chain kills with a weapon to master it for the whole team.',
+    'Kills build everyone\'s combo. Chain kills with a weapon to master it for the whole team.',
+    `Online: host a room and up to ${MAX_PLAYERS - 1} friends can join with the code. More players, more zombies.`,
     'Spend cash in the shop between waves. Watch for wave modifiers and elites carrying weapon mods.',
     `Every ${BOSS_EVERY}th wave brings a boss that drops rare and legendary weapons. Each drop goes to whoever grabs it.`,
     'New weapons unlock as the waves go on.' + (best ? `   Best: wave ${best}` : '')
   ];
   ctx.font = `15px ${FONT}`; ctx.fillStyle = '#a9a28a';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, 456 + i * 22));
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, 440 + i * 19));
 }
 
 function draw() {
@@ -1836,86 +1987,177 @@ function draw() {
     ctx.fillStyle = '#d0402f'; ctx.fillText('OVERRUN', W / 2, H / 2 - 60);
     ctx.font = `24px ${FONT}`; ctx.fillStyle = '#e6dfc8';
     ctx.fillText(`You made it to wave ${wave}. Best: wave ${best}`, W / 2, H / 2 - 6);
-    ctx.fillStyle = '#f2b134'; ctx.fillText('P1  ' + players[0].score, W / 2 - 120, H / 2 + 36);
-    ctx.fillStyle = '#5fc6d6'; ctx.fillText('P2  ' + players[1].score, W / 2 + 120, H / 2 + 36);
+    const list = players.filter(q => !q.gone).sort((a, b) => b.score - a.score);
+    const rows = Math.ceil(list.length / 2);
+    list.forEach((q, k) => {
+      const col = list.length > 2 ? k % 2 : k, row = list.length > 2 ? Math.floor(k / 2) : 0;
+      ctx.textAlign = 'center'; ctx.font = `bold 20px ${FONT}`; ctx.fillStyle = q.head;
+      ctx.fillText(`${list.length > 2 ? '#' + (k + 1) + '  ' : ''}${q.name}  ${q.score}`, W / 2 + (col ? 150 : -150), H / 2 + 36 + row * 28);
+    });
+    ctx.textAlign = 'center';
     ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = '#e6dfc8';
-    ctx.fillText('Press R to play again', W / 2, H / 2 + 90);
+    ctx.fillText('Press R to play again', W / 2, H / 2 + 64 + (list.length > 2 ? rows : 1) * 28);
   }
 }
 
 /* ---------------- networking ---------------- */
-const ROOM_PREFIX = 'blockrot-v4-room-';
+// Star network: the host's browser runs the game; every guest connects to the host.
+const ROOM_PREFIX = 'blockrot-v5-room-';
 const menu = document.getElementById('menu');
 const netEl = document.getElementById('net');
 const codeEl = document.getElementById('code');
+const nameEl = document.getElementById('pname');
 const setNet = t => { netEl.textContent = t; };
-const send = o => { if (conn && conn.open) conn.send(o); };
+const cleanName = (raw, fallback) => (String(raw || '').replace(/[^\w \-]/g, '').trim().slice(0, 12) || fallback);
+const sendTo = (c, o) => { if (c && c.open) c.send(o); };
+function send(o) {
+  if (mode === 'guest') sendTo(conn, o);
+  else if (mode === 'host') for (const gst of guests) sendTo(gst.conn, o);
+}
 
 function cleanupNet() {
-  const c = conn, pr = peer;
-  conn = null; peer = null;
-  if (c) try { c.close(); } catch (e) {}
-  if (pr) try { pr.destroy(); } catch (e) {}
+  const list = guests.map(gst => gst.conn).concat(conn ? [conn] : []);
+  const pr = peer;
+  guests = []; conn = null; peer = null; roster = []; roomCode = '';
   mode = 'local'; myIndex = 0; lobby = 'none';
   netHeld = {}; netTaps = {}; lastHeldSent = ''; decalQueue.length = 0;
+  for (const c of list) try { c.close(); } catch (e) {}
+  if (pr) try { pr.destroy(); } catch (e) {}
 }
 function netReady() {
   if (typeof Peer !== 'undefined') return true;
   setNet('Online play could not load. Check your internet connection and refresh the page.');
   return false;
 }
+function lobbyText() {
+  const names = roster.map(r => r.name).join(', ');
+  if (mode === 'host') {
+    setNet(`Room code: ${roomCode}   Players ${roster.length}/${MAX_PLAYERS}: ${names}. ` +
+           (guests.length ? 'Press Space or Enter to start. Friends can still join mid-game.' : 'Waiting for friends to join...'));
+  } else if (mode === 'guest') {
+    setNet(`Room ${roomCode}   Players ${roster.length}/${MAX_PLAYERS}: ${names}. Waiting for the host to start.`);
+  }
+}
+
+/* host side */
 function hostOnline() {
   if (!netReady()) return;
   cleanupNet();
-  lobby = 'hosting';
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const code = Array.from({ length: 5 }, () => chars[Math.random() * chars.length | 0]).join('');
+  mode = 'host'; myIndex = 0; lobby = 'hosting'; roomCode = code;
+  roster = [{ idx: 0, name: cleanName(nameEl.value, 'P1') }];
   peer = new Peer(ROOM_PREFIX + code);
   setNet('Creating a room...');
-  peer.on('open', () => setNet(`Room code: ${code}. Send it to your friend and keep this tab open.`));
-  peer.on('connection', c => {
-    if (conn) { c.on('open', () => c.close()); return; }
-    c.on('open', () => beginHost(c));
-  });
+  peer.on('open', () => lobbyText());
+  peer.on('connection', c => c.on('open', () => guestJoined(c)));
   peer.on('error', e => setNet(e.type === 'unavailable-id' ? 'That code was taken. Press Host again.'
                                  : 'Could not create a room (' + e.type + '). Try another network.'));
 }
+function freeIndex() {
+  const used = i => i === 0 || guests.some(gst => gst.idx === i);
+  for (let i = 1; i < MAX_PLAYERS; i++) {
+    if (used(i)) continue;
+    if (state === 'title' || !players[i] || players[i].gone) return i;
+  }
+  return -1;
+}
+function guestJoined(c) {
+  if (mode !== 'host') { c.close(); return; }
+  const idx = freeIndex();
+  if (idx < 0) { sendTo(c, { t: 'full' }); setTimeout(() => { try { c.close(); } catch (e) {} }, 800); return; }
+  const gst = { conn: c, idx, name: cleanName(c.metadata && c.metadata.name, 'P' + (idx + 1)) };
+  guests.push(gst);
+  roster = roster.filter(r => r.idx !== idx).concat([{ idx, name: gst.name }]).sort((a, b) => a.idx - b.idx);
+  netHeld[idx] = {}; netTaps[idx] = {};
+  c.on('data', d => onHostData(gst, d));
+  c.on('close', () => guestLeft(gst));
+  c.on('error', () => guestLeft(gst));
+  sendTo(c, { t: 'welcome', idx, code: roomCode });
+  if (state !== 'title') {
+    addLatePlayer(idx, gst.name);
+    sendTo(c, { t: 'start' });
+    snapAcc = 1;
+    banner(gst.name + ' joined the fight', '#8fd67a');
+  }
+  broadcastLobby();
+  if (state === 'title') lobbyText();
+}
+function addLatePlayer(idx, name) {
+  const p = newPlayer(idx, name);
+  const anchor = players.find(q => q.alive && !q.gone);
+  if (anchor) { p.x = anchor.x + rand(-30, 30); p.y = anchor.y + rand(-30, 30); solid(p); }
+  grantWeapons(p);
+  const others = players.filter(q => q && !q.gone);
+  p.cash = others.length ? Math.round(others.reduce((a, q) => a + q.cash, 0) / others.length / 2) : 0;
+  p.hurt = 1;
+  while (players.length < idx) { const filler = newPlayer(players.length); filler.gone = true; filler.alive = false; players.push(filler); }
+  players[idx] = p;
+}
+function guestLeft(gst) {
+  const k = guests.indexOf(gst);
+  if (k < 0) return;
+  guests.splice(k, 1);
+  roster = roster.filter(r => r.idx !== gst.idx);
+  netHeld[gst.idx] = {}; netTaps[gst.idx] = {};
+  if (state !== 'title' && players[gst.idx]) {
+    const p = players[gst.idx];
+    p.gone = true; p.alive = false;
+    banner(p.name + ' left the game', '#e2735f');
+    if (players.every(q => !q.alive)) gameOver();
+  }
+  broadcastLobby();
+  if (state === 'title') lobbyText();
+}
+function broadcastLobby() { send({ t: 'lobby', roster, code: roomCode }); }
+function onHostData(gst, d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'held' && d.h) {
+    const h = netHeld[gst.idx] = {};
+    for (const a of ACTIONS) h[a] = !!d.h[a];
+  } else if (d.t === 'tap' && typeof d.a === 'string' && d.a.length < 12) {
+    (netTaps[gst.idx] = netTaps[gst.idx] || {})[d.a] = true;
+  }
+}
+
+/* guest side */
 function joinOnline() {
   if (!netReady()) return;
   const code = codeEl.value.trim().toUpperCase();
   if (code.length < 5) { setNet('Type the 5-letter room code first.'); return; }
   cleanupNet();
-  lobby = 'joining';
+  lobby = 'joining'; roomCode = code;
   peer = new Peer();
   setNet('Connecting...');
   peer.on('open', () => {
-    const c = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: 'json' });
+    const c = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: 'json',
+                                                 metadata: { name: cleanName(nameEl.value, '') } });
     c.on('open', () => beginGuest(c));
     setTimeout(() => { if (lobby === 'joining' && !conn) setNet('Still connecting. Check the code, or try a different network.'); }, 10000);
   });
   peer.on('error', e => setNet(e.type === 'peer-unavailable' ? 'No room with that code. Check it and try again.'
                                  : 'Connection problem (' + e.type + '). Try another network.'));
 }
-function wire(c) {
-  c.on('data', onData);
+function beginGuest(c) {
+  conn = c; mode = 'guest'; myIndex = -1; lobby = 'connected';
+  c.on('data', onGuestData);
   c.on('close', connectionLost);
   c.on('error', connectionLost);
+  setNet('Connected! Waiting for the host...');
 }
-function beginHost(c) {
-  conn = c; mode = 'host'; myIndex = 0; lobby = 'connected';
-  wire(c);
-  setNet('Your friend joined! Press Space or Enter to start. You are P1.');
-}
-function beginGuest(c) {
-  conn = c; mode = 'guest'; myIndex = 1; lobby = 'connected';
-  wire(c);
-  setNet('Connected! Waiting for the host to start. You are P2.');
+function onGuestData(d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'welcome') { myIndex = d.idx; if (d.code) roomCode = d.code; }
+  else if (d.t === 'lobby') { roster = d.roster || []; if (state === 'title') lobbyText(); }
+  else if (d.t === 'full') { lobby = 'full'; cleanupNet(); setNet(`That room is full (${MAX_PLAYERS} players).`); }
+  else if (d.t === 'start') guestStart();
+  else if (d.t === 'snap') applySnap(d);
 }
 function connectionLost() {
   if (lobby !== 'connected') return;
   lobby = 'none';
   conn = null;
-  if (state === 'title') { setNet('Your friend left the room.'); cleanupNet(); }
+  if (state === 'title') { cleanupNet(); setNet('The host closed the room.'); }
   else state = 'lost';
 }
 function backToMenu() {
@@ -1924,21 +2166,18 @@ function backToMenu() {
   setNet('');
 }
 
-function onData(d) {
-  if (!d || typeof d !== 'object') return;
-  if (mode === 'host') {
-    if (d.t === 'held' && d.h) for (const a of ACTIONS) netHeld[a] = !!d.h[a];
-    else if (d.t === 'tap' && typeof d.a === 'string') netTaps[d.a] = true;
-  } else if (mode === 'guest') {
-    if (d.t === 'start') guestStart();
-    else if (d.t === 'snap') applySnap(d);
-  }
-}
-
 /* host -> guest snapshot */
 const BKINDS = ['bullet', 'rocket', 'plasma', 'homing', 'flame'];
 const EKINDS = ['fire', 'acid', 'orb'];
 const f2 = v => Math.round(v * 100) / 100;
+const slotArr = sl => [sl.id, sl.rarity, sl.ammo === Infinity ? -1 : sl.ammo, sl.max === Infinity ? -1 : sl.max, sl.mod || 0];
+function detailFor(p) {
+  return {
+    cur: p.cur, sl: p.slots.map(slotArr), ca: p.cash, b: p.build, up: p.up, mc: f2(p.medCd),
+    ch: p.chain, ct: Object.fromEntries(Object.entries(p.chainT).map(([k, v]) => [k, f2(v)])),
+    se: p.sel, ms: p.msgT > 0 ? p.msg : ''
+  };
+}
 function snapshot() {
   const r = Math.round, pal = [];
   const ci = c => { let i = pal.indexOf(c); if (i < 0) { i = pal.length; pal.push(c); } return i; };
@@ -1947,12 +2186,9 @@ function snapshot() {
     am: [...activeMods], nm: nextMods, sh: r(shake), best,
     ma: Object.keys(mastery).map(k => mastery[k].lv),
     pl: players.map(p => ({
-      x: r(p.x), y: r(p.y), dx: f2(p.dx), dy: f2(p.dy), hp: r(p.hp), al: p.alive, rv: f2(p.rev),
-      w: f2(p.walk % 6.283), cur: p.cur, hu: p.hurt > 0 ? 1 : 0,
-      sl: p.slots.map(sl => [sl.id, sl.rarity, sl.ammo === Infinity ? -1 : sl.ammo, sl.max === Infinity ? -1 : sl.max, sl.mod || 0]),
-      sc: p.score, ca: p.cash, co: p.combo, b: p.build, up: p.up, mc: f2(p.medCd),
-      ch: p.chain, ct: Object.fromEntries(Object.entries(p.chainT).map(([k, v]) => [k, f2(v)])),
-      se: p.sel, rd: p.ready, ms: p.msgT > 0 ? p.msg : ''
+      x: r(p.x), y: r(p.y), dx: f2(p.dx), dy: f2(p.dy), hp: r(p.hp), mh: maxHp(p), al: p.alive, g: p.gone ? 1 : 0,
+      rv: f2(p.rev), w: f2(p.walk % 6.283), hu: p.hurt > 0 ? 1 : 0, sc: p.score, co: p.combo,
+      nm: p.name, rd: p.ready, cs: p.slots[p.cur] ? slotArr(p.slots[p.cur]) : 0
     })),
     z: zombies.map(z => [z.id, z.boss ? z.key : z.type, r(z.x), r(z.y), z.r, r(z.hp), r(z.max), f2(z.dx), f2(z.dy),
       f2(z.walk % 6.283), z.flash > 0 ? 1 : 0, (z.elite ? 1 : 0) | (z.slow > 0 ? 2 : 0) | (z.burn > 0 ? 4 : 0),
@@ -1972,7 +2208,7 @@ function snapshot() {
     md: meds.map(m => [r(m.x), r(m.y)]),
     tx: texts.map(q => [r(q.x), r(q.y), q.t, ci(q.color), f2(q.life)]),
     bn: banners.slice(0, 1).map(b => [b.text, b.color, b.big ? 1 : 0, f2(b.life)]),
-    pa: particles.slice(-260).map(q => [r(q.x), r(q.y), r(q.size), ci(q.color), f2(q.life / q.max)]),
+    pa: particles.slice(guests.length > 4 ? -150 : -260).map(q => [r(q.x), r(q.y), r(q.size), ci(q.color), f2(q.life / q.max)]),
     dc: decalQueue.splice(0)
   };
   out.pal = pal;
@@ -1983,7 +2219,7 @@ function snapshot() {
 function guestStart() {
   mastery = {};
   for (const id in W_DEFS) mastery[id] = { lv: 0 };
-  players = [newPlayer(0), newPlayer(1)];
+  players = [];
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = []; barrels = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
   strikes = []; meds = []; activeMods = new Set(); nextMods = [];
@@ -1998,27 +2234,40 @@ function guestSlot(a) {
            ammo: ammo < 0 ? Infinity : ammo, max: max < 0 ? Infinity : max, mod: mod || undefined };
 }
 function applySnap(S) {
-  if (!players.length) guestStart();
-  if (players[0].slots.length === 0 && !S.pl[0].sl.length) return;
+  if (!mastery.pistol) for (const id in W_DEFS) mastery[id] = { lv: 0 };
+  if (myIndex < 0 && typeof S.you === 'number') myIndex = S.you;
+  if (myIndex < 0) return;
   const pal = S.pal || [];
   state = S.st; wave = S.wave; toSpawn = S.ts; clearT = S.cl; intermission = S.it; teamEnergy = S.te;
   activeMods = new Set(S.am); nextMods = S.nm; shake = S.sh; best = Math.max(best, S.best || 0);
   Object.keys(mastery).forEach((k, i) => { mastery[k].lv = S.ma[i] || 0; });
 
+  while (players.length < S.pl.length) {
+    const np = newPlayer(players.length);
+    np.fresh = true;
+    players.push(np);
+  }
+  players.length = S.pl.length;
   S.pl.forEach((q, i) => {
     const p = players[i];
     const self = i === myIndex;
-    p.hp = q.hp; p.rev = q.rv; p.cur = q.cur; p.hurt = q.hu ? .1 : 0;
-    p.slots = q.sl.map(guestSlot);
-    p.score = q.sc; p.cash = q.ca; p.combo = q.co; p.build = q.b; p.up = q.up; p.medCd = q.mc;
-    p.chain = q.ch; p.chainT = q.ct; p.sel = q.se; p.ready = q.rd; p.msg = q.ms; p.msgT = q.ms ? 1 : 0;
+    p.name = q.nm; p.gone = !!q.g; p.hp = q.hp; p.up.armor = Math.round((q.mh - 100) / 20);
+    p.rev = q.rv; p.hurt = q.hu ? .1 : 0; p.score = q.sc; p.combo = q.co; p.ready = q.rd;
+    if (self && S.me) {
+      const m = S.me;
+      p.slots = m.sl.map(guestSlot); p.cur = m.cur; p.cash = m.ca; p.build = m.b; p.up = m.up;
+      p.medCd = m.mc; p.chain = m.ch; p.chainT = m.ct; p.sel = m.se; p.msg = m.ms; p.msgT = m.ms ? 1 : 0;
+    } else {
+      p.slots = q.cs ? [guestSlot(q.cs)] : []; p.cur = 0;
+    }
     const revived = !p.alive && q.al;
     p.alive = q.al;
     p.tx = q.x; p.ty = q.y;
     const far = Math.hypot(q.x - p.x, q.y - p.y) > 150;
-    if (far || revived || (self && (!p.alive || state !== 'play'))) { p.x = q.x; p.y = q.y; }
+    if (p.fresh || far || revived || (self && (!p.alive || state !== 'play'))) { p.x = q.x; p.y = q.y; p.fresh = false; }
     if (!self) { p.dx = q.dx; p.dy = q.dy; p.walk = q.w; }
   });
+  if (!players[myIndex]) return;
 
   const old = new Map(zombies.map(z => [z.id, z]));
   zombies = S.z.map(a => {
@@ -2081,9 +2330,6 @@ function guestFrame(dt) {
       me.dx = mx; me.dy = my; me.walk += dt * 12;
       const spd = me.speed * (1 + .08 * me.up.speed);
       me.x += mx * spd * dt; me.y += my * spd * dt;
-      const mate = players[1 - myIndex];
-      me.x = clamp(me.x, mate.x - MAXDX, mate.x + MAXDX);
-      me.y = clamp(me.y, mate.y - MAXDY, mate.y + MAXDY);
       solid(me);
     }
     const ex = (me.tx ?? me.x) - me.x, ey = (me.ty ?? me.y) - me.y, e = Math.hypot(ex, ey);
@@ -2092,7 +2338,7 @@ function guestFrame(dt) {
   }
   const smooth = Math.min(1, dt * 15);
   for (const p of players) {
-    if (p === me && p.alive && state === 'play') continue;
+    if (p.gone || (p === me && p.alive && state === 'play')) continue;
     if (p.tx !== undefined) { p.x += (p.tx - p.x) * smooth; p.y += (p.ty - p.y) * smooth; }
   }
   for (const z of zombies) { z.x += (z.tx - z.x) * smooth; z.y += (z.ty - z.y) * smooth; }
@@ -2117,17 +2363,17 @@ function loop(now) {
   if (state === 'lost') {
     if (tap(['KeyR'])) backToMenu();
   } else if (mode === 'guest') {
-    if (state === 'title') { /* waiting for the host */ }
-    else guestSendInput();
-    if (state !== 'title') guestFrame(dt);
+    if (state !== 'title' && myIndex >= 0 && players[myIndex]) { guestSendInput(); guestFrame(dt); }
   } else {
-    const wantPause = tap(['KeyP', 'Escape']) || netTaps.pause;
-    const wantRestart = tap(['KeyR']) || netTaps.restart;
+    const remote = Object.values(netTaps);
+    const wantPause = tap(['KeyP', 'Escape']) || remote.some(t => t.pause);
+    const wantRestart = tap(['KeyR']) || remote.some(t => t.restart);
     if (state === 'title') {
       if (tap(['Space', 'Enter', 'NumpadEnter'])) {
-        if (mode === 'host' && conn) startGame();
-        else if (lobby === 'none') { setNet(''); startGame(); }
-        else if (lobby === 'hosting') setNet('Still waiting for your friend to join...');
+        if (mode === 'host') {
+          if (guests.length) startGame();
+          else setNet(`Room code: ${roomCode}. Nobody has joined yet. Share the code, or use "Play on one keyboard".`);
+        } else { setNet(''); startGame(); }
       }
     } else if (state === 'play') {
       if (wantPause) state = 'paused';
@@ -2142,11 +2388,19 @@ function loop(now) {
       updateFx(dt);
       if (wantRestart) startGame();
     }
-    netTaps = {};
-    if (mode === 'host' && conn && state !== 'title') {
+    for (const k in netTaps) netTaps[k] = {};
+    if (mode === 'host' && guests.length && state !== 'title') {
       snapAcc += dt;
-      const busy = conn.dataChannel && conn.dataChannel.bufferedAmount > 300000;
-      if (snapAcc >= .05 && !busy) { snapAcc = 0; send(snapshot()); }
+      if (snapAcc >= (guests.length > 4 ? .066 : .05)) {
+        snapAcc = 0;
+        const base = snapshot();
+        for (const gst of guests) {
+          const dc = gst.conn.dataChannel;
+          if (dc && dc.bufferedAmount > 300000) continue;   // this guest is lagging; skip a frame for them
+          const pl = players[gst.idx];
+          sendTo(gst.conn, Object.assign({}, base, { you: gst.idx, me: pl ? detailFor(pl) : null }));
+        }
+      }
     }
   }
   draw();
