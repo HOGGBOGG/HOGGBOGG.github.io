@@ -267,14 +267,14 @@ const ZT = {
 // Elites are rarer, much tougher, and fire dense bullet-hell patterns.
 // They fire faster the more players are in the game.
 const ELITE_PATTERNS = {
-  spiral: { name:'Spiral',  every:.22, shots:2,  speed:210, kind:'fire', desc:'endless spinning stream' },
-  ring:   { name:'Nova',    every:1.5, shots:16, speed:200, kind:'orb',  desc:'rings of orbs' },
-  fan:    { name:'Scatter', every:.62, shots:7,  speed:250, kind:'acid', arc:1.1, aim:true, desc:'wide aimed fans' },
-  cross:  { name:'Lattice', every:.75, shots:8,  speed:190, kind:'ice',  desc:'rotating lattice of ice' },
-  hunter: { name:'Hunter',  every:.30, shots:3,  speed:300, kind:'bone', arc:.30, aim:true, desc:'fast aimed volleys' }
+  spiral: { name:'Spiral',  every:.38, shots:2,  speed:210, kind:'fire', desc:'slow spinning stream' },
+  ring:   { name:'Nova',    every:1.9, shots:10, speed:200, kind:'orb',  desc:'heavy rings of orbs' },
+  fan:    { name:'Scatter', every:.90, shots:5,  speed:250, kind:'acid', arc:1.1, aim:true, desc:'wide aimed fans' },
+  cross:  { name:'Lattice', every:1.05, shots:6, speed:190, kind:'ice',  desc:'rotating lattice of ice' },
+  hunter: { name:'Hunter',  every:.62, shots:3,  speed:300, kind:'bone', arc:.34, aim:true, desc:'heavy aimed volleys' }
 };
-const ELITE_RATE_PER_PLAYER = .17;   // each extra player makes elites this much faster
-const ESHOT_CAP = 420;
+const ELITE_RATE_PER_PLAYER = .12;   // each extra player makes elites this much faster
+const ESHOT_CAP = 300;
 
 /* ---------------- CONFIG: bosses ---------------- */
 const BOSS_EVERY = 5;
@@ -1471,12 +1471,14 @@ function gameOver() {
 }
 
 /* ---------------- enemy projectiles ---------------- */
-const ESHOT = { fire:[6,14,'#ff7a2f'], acid:[7,10,'#b6e04a'], orb:[8,16,'#9ad7ff'],
-                ice:[6,11,'#bfe9ff'], bone:[5,19,'#efe7d2'], void:[9,21,'#c77ddb'] };
-function eShot(x, y, a, speed, kind) {
+const ESHOT = { fire:[6,21,'#ff7a2f'], acid:[7,15,'#b6e04a'], orb:[8,23,'#9ad7ff'],
+                ice:[6,16,'#bfe9ff'], bone:[5,28,'#efe7d2'], void:[9,30,'#c77ddb'] };
+// mul lets a lone spitter stay fair while a boss volley of the same kind bites
+function eShot(x, y, a, speed, kind, mul) {
   if (eshots.length >= ESHOT_CAP) return;
   const spec = ESHOT[kind] || ESHOT.fire;
-  eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: spec[0], dmg: spec[1], kind, life: 2.8 });
+  eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: spec[0],
+                dmg: Math.round(spec[1] * (mul === undefined ? 1 : mul)), kind, life: 2.8 });
 }
 
 /* ---------------- team abilities ---------------- */
@@ -1632,11 +1634,11 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         if (room()) for (let k = 0; k < 3; k++) newZ.push(makeZombie('crawler', z.x + rand(-50, 50), z.y + rand(-50, 50), true));
         burst(z.x, z.y, '#a08660', 16, 160, 6);
       }
-      if (z.t2 <= 0) { z.t2 = 2.2 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .25, 230, 'acid'); }
+      if (z.t2 <= 0) { z.t2 = 3.0 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .25, 230, 'acid'); }
       break;
     case 'pyre':
-      if (z.t1 <= 0) { z.t1 = 3.4 * rg; for (let k = 0; k < 14; k++) eShot(z.x, z.y, k / 14 * 6.283 + time, 200, 'fire'); }
-      if (z.t2 <= 0) { z.t2 = 1.2 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .18, 280, 'fire'); }
+      if (z.t1 <= 0) { z.t1 = 3.6 * rg; for (let k = 0; k < 9; k++) eShot(z.x, z.y, k / 9 * 6.283 + time, 200, 'fire'); }
+      if (z.t2 <= 0) { z.t2 = 2.4 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .18, 280, 'fire'); }
       if (Math.random() < .5) particles.push({ x: z.x + rand(-z.r, z.r), y: z.y - z.r * 1.4, vx: 0, vy: -60, life: .4, max: .4, size: 7, color: '#ff7a2f' });
       break;
     case 'wraith':
@@ -1645,7 +1647,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         if (z.blinkT <= 0) {
           burst(z.x, z.y, '#9ad7ff', 20, 200, 6);
           z.x = z.bx; z.y = z.by;
-          for (let k = 0; k < 10; k++) eShot(z.x, z.y, k / 10 * 6.283, 210, 'orb');
+          for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283, 210, 'orb');
           burst(z.x, z.y, '#9ad7ff', 20, 200, 6);
           addShake(8);
         }
@@ -1673,13 +1675,13 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         addShake(10);
         beams.push({ ring: true, x1: z.x, y1: z.y, r: 230, color: '#8c969e', life: .45, max: .45 });
         for (const p of players) if (p.alive && !p.gone && dist(p, z) < 230) hurt(p, z.dmg);
-        for (let k = 0; k < 12; k++) eShot(z.x, z.y, k / 12 * 6.283 + .2, 250, 'bone');
+        for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283 + .2, 250, 'bone');
       }
       break;
     case 'tyrant':                                   // full bullet hell
       if (z.t1 <= 0) {
-        z.t1 = .16 * rg;
-        z.spin = (z.spin || 0) + .38;
+        z.t1 = .34 * rg;
+        z.spin = (z.spin || 0) + .62;
         for (let k = 0; k < 3; k++) eShot(z.x, z.y, z.spin + k / 3 * 6.283, 195, 'orb');
       }
       if (z.t2 <= 0) {
@@ -1689,8 +1691,8 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       break;
     case 'plague':
       if (z.t1 <= 0) {
-        z.t1 = 2.6 * rg;
-        for (let k = -2; k <= 2; k++) eShot(z.x, z.y, a + k * .22, 240, 'acid');
+        z.t1 = 2.8 * rg;
+        for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .28, 240, 'acid');
       }
       if (z.t2 <= 0) {
         z.t2 = 5.5 * rg;
@@ -1712,9 +1714,9 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         z.t1 = 4.2 * rg;
         beams.push({ ring: true, x1: z.x, y1: z.y, r: 300, color: '#b8e8ff', life: .5, max: .5 });
         for (const p of players) if (p.alive && !p.gone && dist(p, z) < 300) { p.slow = 2.5; hurt(p, z.dmg * .5); }
-        for (let k = 0; k < 18; k++) eShot(z.x, z.y, k / 18 * 6.283, 170, 'ice');
+        for (let k = 0; k < 12; k++) eShot(z.x, z.y, k / 12 * 6.283, 170, 'ice');
       }
-      if (z.t2 <= 0) { z.t2 = 1.5 * rg; for (let k = -3; k <= 3; k++) eShot(z.x, z.y, a + k * .13, 290, 'ice'); }
+      if (z.t2 <= 0) { z.t2 = 2.3 * rg; for (let k = -2; k <= 2; k++) eShot(z.x, z.y, a + k * .16, 290, 'ice'); }
       break;
     case 'gravelord':
       if (z.t1 <= 0) {
@@ -1730,7 +1732,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         corpses = corpses.filter(c => !c.used);
         if (!raised && room()) for (let k = 0; k < 2; k++) newZ.push(makeZombie('walker', z.x + rand(-60, 60), z.y + rand(-60, 60), true));
       }
-      if (z.t2 <= 0) { z.t2 = 1.9 * rg; for (let k = -2; k <= 2; k++) eShot(z.x, z.y, a + k * .16, 330, 'bone'); }
+      if (z.t2 <= 0) { z.t2 = 2.6 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .2, 330, 'bone'); }
       break;
     case 'devourer':
       if (z.chargeT > 0) { z.chargeT -= dt; z.charging = true; if (z.chargeT <= 0) z.charging = false; }
@@ -1752,10 +1754,15 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       }
       if (z.wardT > 0) {
         z.wardT -= dt; z.ward = true; z.frozen = true;
-        if (Math.random() < .5) { z.spin = (z.spin || 0) + .5; for (let k = 0; k < 4; k++) eShot(z.x, z.y, z.spin + k / 4 * 6.283, 220, 'void'); }
+        z.wardShot = (z.wardShot || 0) - dt;
+        if (z.wardShot <= 0) {
+          z.wardShot = .36 * rg;
+          z.spin = (z.spin || 0) + .55;
+          for (let k = 0; k < 3; k++) eShot(z.x, z.y, z.spin + k / 3 * 6.283, 220, 'void');
+        }
         if (z.wardT <= 0) z.ward = false;
       }
-      if (z.t2 <= 0) { z.t2 = .22 * rg; eShot(z.x, z.y, a + rand(-.12, .12), 340, 'void'); }
+      if (z.t2 <= 0) { z.t2 = .42 * rg; eShot(z.x, z.y, a + rand(-.12, .12), 340, 'void'); }
       break;
   }
 }
@@ -1998,7 +2005,7 @@ function update(dt) {
       z.shoot -= dt;
       if (z.shoot <= 0 && bd < 450) {
         z.shoot = rand(2, 3.2) * (activeMods.has('bloodmoon') ? .6 : 1);
-        eShot(z.x, z.y - 6, Math.atan2(tdy, tdx), z.ranged === 'acid' ? 230 : 260, z.ranged);
+        eShot(z.x, z.y - 6, Math.atan2(tdy, tdx), z.ranged === 'acid' ? 230 : 260, z.ranged, z.elite ? 1 : .62);
       }
     }
     if (z.necro) {
@@ -2612,9 +2619,10 @@ function drawWorld() {
   for (const f of eshots) {
     if (!vis(f)) continue;
     const col = (ESHOT[f.kind] || ESHOT.fire)[2];
-    ctx.fillStyle = col + '55'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 2, 0, 6.283); ctx.fill();
+    ctx.fillStyle = col + '55'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 2.4, 0, 6.283); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 1.3, 0, 6.283); ctx.fill();
     ctx.fillStyle = f.kind === 'orb' ? '#e8f6ff' : f.kind === 'acid' ? '#dff58a' : f.kind === 'ice' ? '#eaffff' : f.kind === 'void' ? '#f0d8ff' : '#ffd36a';
-    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r * .85, 0, 6.283); ctx.fill();
   }
   for (const q of particles) {
     if (!vis(q)) continue;
@@ -3123,7 +3131,7 @@ function drawTitle() {
     'Weapon mods stack: fit the same mod twice and it works twice as hard.',
     'Shop upgrades are randomised each visit and never run out, but the price climbs fast.',
     `Every ${BOSS_EVERY}th wave is a boss; heavy waves send minibosses instead of endless small fry.`,
-    'Elites fire bullet-hell patterns, and they fire faster the more players you bring.',
+    'Elites fire heavy bullet patterns, and they fire faster the more players you bring.',
     `Online: host a room and up to ${MAX_PLAYERS - 1} friends join with the code.` + (best ? `   Best: wave ${best}` : '')
   ];
   ctx.textAlign = 'center'; ctx.font = `15px ${FONT}`; ctx.fillStyle = '#a9a28a';
