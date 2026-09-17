@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Huddle Hop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky:#e6f2ee; --ink:#2d2a3e; --slate:#3f3b5c; --slate-hi:#6a64a0;
+  --red:#ff5a5f; --blue:#3d8bff; --yellow:#ffc93c; --green:#34c77b; --orange:#ff8c42; --purple:#a66cff;
+  --card:#ffffff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--sky);color:var(--ink);
+  font-family:Fredoka,"Trebuchet MS",system-ui,sans-serif;overflow:hidden;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}
+.panel{background:var(--card);border:3px solid var(--ink);border-radius:22px;padding:24px 26px;
+  width:min(440px,100%);box-shadow:0 7px 0 var(--ink);max-height:calc(100vh - 32px);overflow:auto}
+h1{font-size:clamp(44px,9vw,64px);line-height:.95;margin:0 0 4px;font-weight:700;letter-spacing:-1px}
+h1 span{display:inline-block}
+.sub{margin:0 0 20px;font-size:17px;opacity:.75}
+label{display:block;font-weight:600;margin:14px 0 6px;font-size:15px}
+input{width:100%;font:inherit;font-size:18px;padding:10px 12px;border:3px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink)}
+input:focus-visible,button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.row{display:flex;gap:10px;margin-top:12px}
+button{font:inherit;font-weight:600;font-size:17px;padding:10px 16px;border:3px solid var(--ink);border-radius:12px;
+  background:#fff;color:var(--ink);cursor:pointer;box-shadow:0 4px 0 var(--ink);transition:transform .06s}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.go{background:var(--yellow)}
+button.alt{background:var(--green);color:#fff}
+.grow{flex:1}
+.code{font-size:40px;font-weight:700;letter-spacing:6px;margin:2px 0 4px}
+.roster{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
+.roster li{display:flex;align-items:center;gap:10px;border:2px solid var(--ink);border-radius:12px;padding:6px 10px;font-weight:500}
+.dot{width:22px;height:22px;border-radius:7px;border:2.5px solid var(--ink);flex:none}
+.tag{margin-left:auto;font-size:13px;opacity:.65}
+.lv{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.lv button{padding:8px 0}
+.lv button.on{background:var(--ink);color:#fff}
+.note{font-size:14px;opacity:.7;margin:10px 0 0;line-height:1.35}
+.err{color:#c62f34;font-weight:600;min-height:1.2em;margin:10px 0 0;font-size:15px}
+#hud{position:fixed;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;pointer-events:none;gap:10px}
+#hud .lvl{font-weight:700;font-size:20px}
+#hud .hint{font-size:15px;opacity:.75}
+#hud .tools{pointer-events:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#hud .tools button{font-size:14px;padding:5px 10px;box-shadow:0 3px 0 var(--ink)}
+.pill{background:#fff;border:2px solid var(--ink);border-radius:10px;padding:4px 10px;font-weight:600;font-size:14px}
+#touch{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:14px;pointer-events:none}
+#touch div{display:flex;gap:12px}
+#touch button{pointer-events:auto;width:74px;height:74px;border-radius:50%;font-size:28px;opacity:.85;touch-action:none}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:500;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){button{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="menu" class="screen">
+  <div class="panel">
+    <h1><span style="color:var(--red)">Huddle</span> <span style="color:var(--blue)">Hop</span></h1>
+    <p class="sub">A co-op puzzle platformer for 3 to 6 friends. Nobody finishes alone.</p>
+    <label for="nameIn">Your name</label>
+    <input id="nameIn" maxlength="12" autocomplete="off" placeholder="Player">
+    <div class="row"><button id="hostBtn" class="go grow">Create room</button></div>
+    <label for="codeIn">Or join with a room code</label>
+    <div class="row" style="margin-top:0">
+      <input id="codeIn" maxlength="5" autocomplete="off" placeholder="ABCDE" style="text-transform:uppercase">
+      <button id="joinBtn" class="alt">Join</button>
+    </div>
+    <p class="err" id="menuErr"></p>
+    <p class="note">Move: A/D or arrows · Jump: W, Up or Space · Walk into the open door to finish.</p>
+  </div>
+</div>
+
+<div id="lobby" class="screen hidden">
+  <div class="panel">
+    <div style="font-weight:600;opacity:.7">Room code</div>
+    <div class="code" id="lobCode">-----</div>
+    <div class="row" style="margin-top:4px"><button id="copyBtn" class="grow">Copy invite link</button></div>
+    <ul class="roster" id="roster"></ul>
+    <div id="hostOnly" class="hidden">
+      <label>Start at level</label>
+      <div class="lv" id="lvPick"></div>
+      <div class="row">
+        <button id="addBot" class="grow">Add test player</button>
+        <button id="startBtn" class="go grow">Start game</button>
+      </div>
+      <p class="note" id="lobNote"></p>
+    </div>
+    <p class="note" id="waitNote">Waiting for the host to start…</p>
+    <div class="row"><button id="leaveBtn" class="grow">Leave room</button></div>
+  </div>
+</div>
+
+<div id="hud" class="hidden">
+  <div><div class="lvl" id="hudLvl"></div><div class="hint" id="hudHint"></div></div>
+  <div class="tools">
+    <span class="pill" id="hudCode"></span>
+    <span class="pill hidden" id="hudCtrl"></span>
+    <button id="hRestart" class="hidden">Restart</button>
+    <button id="hSkip" class="hidden">Skip</button>
+    <button id="hLobby" class="hidden">Lobby</button>
+  </div>
+</div>
+
+<div id="touch" class="hidden">
+  <div><button data-k="l" aria-label="Left">◀</button><button data-k="r" aria-label="Right">▶</button></div>
+  <div><button data-k="j" aria-label="Jump">▲</button></div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+'use strict';
+// ===== SIM-START =====
+// Shared simulation. Only the host runs step(); clients just render snapshots.
+const T = 32, ROWS = 17, VW = 960, VH = ROWS * T;
+const PW = 28, PH = 30;
+// Tuned so: 2 tiles = solo jump, 3 tiles = needs 1 friend under you, 4 tiles = needs 2.
+const GRAV = 1800, JUMP_V = 543, MOVE = 170, MAXFALL = 720, BOX_SPEED = 70;
+const DT = 1 / 60;
+const MAX_PLAYERS = 6;
+
+// Scales puzzle requirements to the number of players in the room.
+function needFor(expr, n) {
+  n = Math.max(1, n);
+  if (expr === 'all') return n;
+  if (expr === 'n-1') return Math.max(1, n - 1);
+  if (expr === 'half') return Math.ceil(n / 2);
+  return Math.max(1, Math.min(expr, n));
+}
+
+function makeLevel(w, name, hint) {
+  const g = [];
+  for (let y = 0; y < ROWS; y++) g.push(new Array(w).fill('.'));
+  const L = { w, h: ROWS, g, name, hint, plates: {}, gates: {}, boxes: [], platforms: [],
+    checkpoints: [], spawn: { x: 3, y: 14 }, key: null, door: null };
+  L.rect = (x, y, ww, hh, c = '#') => {
+    for (let j = y; j < y + hh; j++) for (let i = x; i < x + ww; i++)
+      if (j >= 0 && j < ROWS && i >= 0 && i < w) g[j][i] = c;
+  };
+  return L;
+}
+function frameLevel(L) { L.rect(0, 15, L.w, 2); L.rect(0, 0, 1, 15); L.rect(L.w - 1, 0, 1, 15); }
+
+/* Level legend (all coordinates in tiles, row 14 = standing on the floor):
+   '#' solid · digits = gate cells · plates sit on the row above their floor
+   gate mode 'open'  : solid until its plates are active
+   gate mode 'appear': only solid while its plates are active (bridges, steps)
+   need: number (capped at player count), 'all', 'n-1', 'half'            */
+const LEVELS = [
+  function () {
+    const L = makeLevel(48, 'Warm Up', "Jump on a friend's head to reach high places.");
+    frameLevel(L);
+    L.rect(10, 13, 2, 2);                                  // solo jump
+    L.rect(16, 12, 3, 3);                                  // needs a boost
+    L.plates.a = { x: 17, y: 11, w: 1, need: 1, latch: true };
+    L.rect(15, 14, 1, 1, '4'); L.gates['4'] = { by: ['a'], mode: 'appear' }; // step for the last player
+    L.checkpoints.push({ x: 21, y: 14 });
+    L.rect(27, 11, 4, 1);                                  // high shelf: 2-person tower
+    L.key = { x: 28.5, y: 10 };
+    L.door = { x: 42, y: 14 };
+    return L;
+  },
+  function () {
+    const L = makeLevel(56, 'Heavy Lifting', 'Heavy boxes need several pushers, and they count as weight.');
+    frameLevel(L);
+    L.boxes.push({ x: 9, y: 13, w: 2, h: 2, need: 3, weight: 3 });
+    L.plates.a = { x: 19, y: 14, w: 5, need: 3 };
+    L.rect(24, 14, 1, 1);                                  // stopper keeps the box on the plate
+    L.rect(28, 0, 1, 15, '1'); L.gates['1'] = { by: ['a'], mode: 'open' };
+    L.checkpoints.push({ x: 30, y: 14 }, { x: 41, y: 14 });
+    L.key = { x: 32, y: 14 };
+    L.rect(36, 11, 3, 4);                                  // 4-tall wall
+    L.plates.b = { x: 37, y: 10, w: 1, need: 1, latch: true };
+    L.rect(35, 13, 1, 2, '4'); L.gates['4'] = { by: ['b'], mode: 'appear' };
+    L.door = { x: 50, y: 14 };
+    return L;
+  },
+  function () {
+    const L = makeLevel(64, 'All Aboard', 'The platform only moves when everyone is riding it.');
+    frameLevel(L);
+    L.rect(10, 15, 34, 2, '.');                            // the pit
+    L.platforms.push({ x: 10, y: 15, w: 7, dx: 27, dy: 0, mode: 'all', speed: 80 });
+    L.rect(26, 0, 4, 13);                                  // low ceiling: no tall towers
+    L.checkpoints.push({ x: 47, y: 14 });
+    L.rect(51, 15, 3, 1, '.');
+    L.platforms.push({ x: 51, y: 15, w: 3, dx: 0, dy: -5, mode: 'loop', speed: 55, pause: 1 });
+    L.rect(54, 10, 9, 5);
+    L.key = { x: 56, y: 9 };
+    L.door = { x: 60, y: 9 };
+    return L;
+  },
+  function () {
+    const L = makeLevel(72, 'Team Split', 'Hold both switches at once, then regroup.');
+    frameLevel(L);
+    L.rect(8, 12, 3, 3);  L.plates.a = { x: 9, y: 11, w: 1, need: 1 };
+    L.rect(15, 12, 3, 3); L.plates.b = { x: 16, y: 11, w: 1, need: 1 };
+    L.rect(21, 0, 1, 15, '1'); L.gates['1'] = { by: ['a', 'b'], mode: 'open', latch: true };
+    L.key = { x: 23, y: 14 };
+    L.checkpoints.push({ x: 24, y: 14 });
+    L.plates.c = { x: 25, y: 14, w: 2, need: 1 };
+    L.rect(28, 15, 10, 2, '.'); L.rect(28, 15, 10, 1, '4');
+    L.gates['4'] = { by: ['c', 'd'], mode: 'appear', any: true };
+    L.plates.d = { x: 40, y: 14, w: 2, need: 1, latch: true };
+    L.checkpoints.push({ x: 43, y: 14 });
+    L.rect(47, 11, 3, 4);
+    L.plates.e = { x: 48, y: 10, w: 1, need: 1, latch: true };
+    L.rect(46, 13, 1, 2, '5'); L.gates['5'] = { by: ['e'], mode: 'appear' };
+    L.checkpoints.push({ x: 51, y: 14 });
+    L.plates.f = { x: 53, y: 14, w: 4, need: 'all' };       // 5+ players must stack to fit
+    L.rect(59, 0, 1, 15, '2'); L.gates['2'] = { by: ['f'], mode: 'open', latch: true };
+    L.door = { x: 65, y: 14 };
+    return L;
+  }
+];
+
+function overlaps(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+
+function buildWorld(li, roster) {
+  const L = LEVELS[li]();
+  const W = { li, L, frame: 0, players: new Map(), boxes: [], plats: [], plateState: {}, plateInfo: {},
+    gateState: {}, gateCells: {}, cam: 0, camInit: false, cpi: -1, phase: 'play', timer: 0 };
+  for (let j = 0; j < ROWS; j++) for (let i = 0; i < L.w; i++) {
+    const c = L.g[j][i];
+    if (c >= '1' && c <= '9') (W.gateCells[c] = W.gateCells[c] || []).push([i, j]);
+  }
+  for (const id in L.gates) W.gateState[id] = false;
+  for (const id in L.plates) { W.plateState[id] = false; W.plateInfo[id] = [0, 1]; }
+  L.checkpoints.sort((a, b) => a.x - b.x);
+  W.boxes = L.boxes.map(b => ({ kind: 'box', x: b.x * T, y: b.y * T, w: b.w * T, h: b.h * T,
+    ox: b.x * T, oy: b.y * T, vy: 0, need: b.need, weight: b.weight, pc: 0 }));
+  W.plats = L.platforms.map(p => ({ kind: 'plat', x: p.x * T, y: p.y * T, w: p.w * T, h: T,
+    sx: p.x * T, sy: p.y * T, ex: (p.x + p.dx) * T, ey: (p.y + p.dy) * T, s: 0,
+    len: Math.hypot(p.dx, p.dy) * T, mode: p.mode, speed: p.speed, pause: p.pause || 0,
+    dir: 1, wait: 0, plate: p.plate, aboard: 0 }));
+  W.key = L.key ? { x: (L.key.x + 0.5) * T, y: (L.key.y + 0.5) * T, carrier: null, used: false } : null;
+  W.door = { x: L.door.x * T + 2, y: (L.door.y - 1) * T, w: T - 4, h: 2 * T, unlocked: false };
+  roster.forEach((r, k) => addPlayer(W, r, k));
+  return W;
+}
+
+function addPlayer(W, r, k) {
+  const p = { kind: 'player', id: r.id, slot: r.slot, name: r.name, x: 0, y: 0, w: PW, h: PH,
+    vx: 0, vy: 0, ground: false, face: 1, in: { l: 0, r: 0, j: 0 }, jumpHeld: false,
+    coyote: 0, buffer: 0, entered: false };
+  W.players.set(r.id, p);
+  placeAtCheckpoint(W, p, k == null ? r.slot : k);
+  return p;
+}
+
+function placeAtCheckpoint(W, p, k) {
+  const c = W.cpi < 0 ? W.L.spawn : W.L.checkpoints[W.cpi];
+  p.x = c.x * T + 2 + ((k % 3) - 1) * 30;
+  p.y = (c.y + 1) * T - PH - Math.floor(k / 3) * 36;
+  p.vx = 0; p.vy = 0;
+  let guard = 0;
+  while (collidersFor(W, p).length && guard++ < 60) p.y -= 8;
+}
+
+function gateSolid(W, id) {
+  const g = W.L.gates[id]; if (!g) return true;
+  const a = W.gateState[id];
+  return g.mode === 'open' ? !a : a;
+}
+function cellSolid(W, i, j) {
+  if (i < 0 || i >= W.L.w) return true;
+  if (j < 0 || j >= ROWS) return false;
+  const c = W.L.g[j][i];
+  if (c === '#') return true;
+  if (c >= '1' && c <= '9') return gateSolid(W, c);
+  return false;
+}
+function bodies(W) {
+  const a = [];
+  for (const p of W.players.values()) if (!p.entered) a.push(p);
+  for (const b of W.boxes) a.push(b);
+  for (const f of W.plats) a.push(f);
+  return a;
+}
+function collidersFor(W, b) {
+  const out = [];
+  const i0 = Math.floor(b.x / T), i1 = Math.floor((b.x + b.w - 0.001) / T);
+  const j0 = Math.floor(b.y / T), j1 = Math.floor((b.y + b.h - 0.001) / T);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++)
+    if (cellSolid(W, i, j)) out.push({ x: i * T, y: j * T, w: T, h: T });
+  for (const o of bodies(W)) if (o !== b && overlaps(b, o)) out.push(o);
+  return out;
+}
+// Axis moves; things already overlapping before the move are ignored (no teleporting).
+function moveX(W, b, dx) {
+  if (!dx) return 0;
+  const ox = b.x; b.x += dx;
+  for (const s of collidersFor(W, b)) {
+    if (dx > 0) { if (s.x >= ox + b.w - 0.01) b.x = Math.min(b.x, s.x - b.w); }
+    else if (s.x + s.w <= ox + 0.01) b.x = Math.max(b.x, s.x + s.w);
+  }
+  return b.x - ox;
+}
+function moveY(W, b, dy) {
+  if (!dy) return 0;
+  const oy = b.y; b.y += dy;
+  for (const s of collidersFor(W, b)) {
+    if (dy > 0) { if (s.y >= oy + b.h - 0.01) b.y = Math.min(b.y, s.y - b.h); }
+    else if (s.y + s.h <= oy + 0.01) b.y = Math.max(b.y, s.y + s.h);
+  }
+  return b.y - oy;
+}
+// Everything standing on `base`, directly or stacked. Bottom-most first.
+function ridersOf(W, base) {
+  const out = [], seen = new Set([base]);
+  const all = bodies(W).filter(b => b.kind !== 'plat');
+  let front = [base];
+  while (front.length) {
+    const nf = [];
+    for (const f of front) for (const b of all) {
+      if (seen.has(b)) continue;
+      if (Math.abs(b.y + b.h - f.y) <= 1 && b.x < f.x + f.w && b.x + b.w > f.x) {
+        seen.add(b); out.push(b); nf.push(b);
+      }
+    }
+    front = nf;
+  }
+  return out;
+}
+function dirOf(p) { return (p.in.r ? 1 : 0) - (p.in.l ? 1 : 0); }
+
+function updatePlat(W, pf, nActive) {
+  const riders = ridersOf(W, pf);
+  pf.aboard = riders.filter(r => r.kind === 'player').length;
+  let dir = 0;
+  if (pf.mode === 'all') {
+    if (nActive > 0 && pf.aboard >= nActive) dir = 1;
+    else if (pf.aboard === 0) dir = -1;
+  } else if (pf.mode === 'plate') {
+    dir = W.plateState[pf.plate] ? 1 : -1;
+  } else {
+    if (pf.wait > 0) pf.wait -= DT; else dir = pf.dir;
+  }
+  if (!dir) return;
+  const ns = Math.max(0, Math.min(pf.len, pf.s + dir * pf.speed * DT));
+  const t = ns / pf.len;
+  const nx = pf.sx + (pf.ex - pf.sx) * t, ny = pf.sy + (pf.ey - pf.sy) * t;
+  const dx = nx - pf.x, dy = ny - pf.y;
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) { pf.s = ns; return; }
+  const test = { x: nx, y: ny, w: pf.w, h: pf.h };
+  const rs = new Set(riders);
+  for (const b of bodies(W)) if (b !== pf && !rs.has(b) && overlaps(test, b)) return; // someone's in the way
+  pf.s = ns;
+  if (pf.mode === 'loop' && (ns === 0 || ns === pf.len)) { pf.dir = ns === 0 ? 1 : -1; pf.wait = pf.pause; }
+  if (dy < 0) {
+    for (let i = riders.length - 1; i >= 0; i--) moveY(W, riders[i], dy);
+    pf.x = nx; pf.y = ny;
+  } else {
+    pf.x = nx; pf.y = ny;
+    for (const r of riders) moveY(W, r, dy);
+  }
+  if (dx) for (const r of riders) moveX(W, r, dx);
+}
+
+// Counts players pushing toward d in an unbroken line against the box (pushing a friend who pushes counts).
+function chainPressing(W, box, d) {
+  const players = [...W.players.values()].filter(p => !p.entered);
+  const used = new Set();
+  let count = 0, front = [box];
+  while (front.length) {
+    const nf = [];
+    for (const f of front) {
+      const e = d > 0 ? f.x : f.x + f.w;
+      for (const p of players) {
+        if (used.has(p)) continue;
+        const pe = d > 0 ? p.x + p.w : p.x;
+        if (Math.abs(pe - e) <= 1.5 && p.y < f.y + f.h && p.y + p.h > f.y && dirOf(p) === d) {
+          used.add(p); count++; nf.push(p);
+        }
+      }
+    }
+    front = nf;
+  }
+  return count;
+}
+
+function updateBox(W, b) {
+  const need = needFor(b.need, W.players.size);
+  const cR = chainPressing(W, b, 1), cL = chainPressing(W, b, -1);
+  b.pc = Math.max(cR, cL);
+  let d = 0;
+  if (cR >= need && cR > cL) d = 1; else if (cL >= need && cL > cR) d = -1;
+  if (d) {
+    const rs = ridersOf(W, b);
+    const m = moveX(W, b, d * BOX_SPEED * DT);
+    if (m) for (const r of rs) moveX(W, r, m);
+  }
+  b.vy = Math.min(b.vy + GRAV * DT, MAXFALL);
+  const dy = b.vy * DT;
+  if (moveY(W, b, dy) < dy - 0.01) b.vy = 0;
+  if (b.y > ROWS * T + 100) { b.x = b.ox; b.y = b.oy; b.vy = 0; }
+}
+
+function updatePlayer(W, p) {
+  const dir = dirOf(p);
+  if (dir) p.face = dir;
+  if (p.in.j && !p.jumpHeld) p.buffer = 0.12;
+  p.jumpHeld = !!p.in.j;
+  if (p.buffer > 0) p.buffer -= DT;
+  if (p.ground) p.coyote = 0.08; else p.coyote -= DT;
+  if (p.buffer > 0 && p.coyote > 0) { p.vy = -JUMP_V; p.buffer = 0; p.coyote = 0; p.ground = false; }
+  if (!p.in.j && p.vy < -JUMP_V * 0.45) p.vy = -JUMP_V * 0.45; // short hop on early release
+  p.vy = Math.min(p.vy + GRAV * DT, MAXFALL);
+
+  const dx = dir * MOVE * DT;
+  if (dx) {
+    const rs = ridersOf(W, p);
+    const m = moveX(W, p, dx);
+    if (m) for (const r of rs) moveX(W, r, m);   // friends on your head come along
+  }
+  const dy = p.vy * DT;
+  if (dy < 0) {                                  // jumping lifts whoever stands on you
+    const rs = ridersOf(W, p);
+    for (let i = rs.length - 1; i >= 0; i--) moveY(W, rs[i], dy);
+  }
+  const my = moveY(W, p, dy);
+  if (dy > 0 && my < dy - 0.01) { p.ground = true; p.vy = 0; }
+  else if (dy < 0 && my > dy + 0.01) { p.vy = 0; p.ground = false; }
+  else p.ground = false;
+
+  if (p.y > ROWS * T + 60) placeAtCheckpoint(W, p, p.slot);
+}
+
+function updatePlates(W) {
+  const n = W.players.size;
+  const bs = bodies(W).filter(b => b.kind !== 'plat');
+  for (const id in W.L.plates) {
+    const pl = W.L.plates[id];
+    const px = pl.x * T, py = (pl.y + 1) * T, pw = pl.w * T;
+    const set = new Set();
+    for (const b of bs) if (Math.abs(b.y + b.h - py) <= 1.5 && b.x < px + pw && b.x + b.w > px) {
+      set.add(b); for (const r of ridersOf(W, b)) set.add(r);
+    }
+    let w = 0;
+    for (const b of set) w += b.kind === 'box' ? b.weight : 1;
+    const need = needFor(pl.need, n);
+    W.plateInfo[id] = [w, need];
+    W.plateState[id] = w >= need || (!!pl.latch && W.plateState[id]);
+  }
+}
+function gateBlocked(W, id) {
+  const bs = bodies(W);
+  for (const [i, j] of W.gateCells[id] || []) {
+    const r = { x: i * T, y: j * T, w: T, h: T };
+    for (const b of bs) if (overlaps(r, b)) return true;
+  }
+  return false;
+}
+function updateGates(W) {
+  for (const id in W.L.gates) {
+    const g = W.L.gates[id];
+    const ps = g.by.map(k => !!W.plateState[k]);
+    let want = g.any ? ps.some(Boolean) : ps.every(Boolean);
+    if (g.latch && W.gateState[id]) want = true;
+    if (want === W.gateState[id]) continue;
+    const solidAfter = g.mode === 'open' ? !want : want;
+    if (solidAfter && gateBlocked(W, id)) continue;   // never close on someone
+    W.gateState[id] = want;
+  }
+}
+function updateKeyDoor(W) {
+  const k = W.key, d = W.door;
+  if (d.unlocked) {
+    for (const p of W.players.values()) {
+      if (p.entered) continue;
+      const cx = p.x + p.w / 2;
+      if (cx > d.x && cx < d.x + d.w && p.y + p.h > d.y + d.h - 6 && p.y < d.y + d.h) p.entered = true;
+    }
+  }
+  if (!k || k.used) return;
+  if (k.carrier != null) {
+    const c = W.players.get(k.carrier);
+    if (!c || c.entered) { k.carrier = null; return; }
+    k.x = c.x + c.w / 2; k.y = c.y - 12;
+    if (overlaps(c, d)) { k.used = true; d.unlocked = true; k.carrier = null; }
+    return;
+  }
+  const kr = { x: k.x - 12, y: k.y - 12, w: 24, h: 24 };
+  for (const p of W.players.values()) if (!p.entered && overlaps(p, kr)) { k.carrier = p.id; break; }
+}
+function updateCheckpoints(W) {
+  const cps = W.L.checkpoints;
+  const act = [...W.players.values()].filter(p => !p.entered);
+  if (!act.length) return;
+  for (let i = cps.length - 1; i > W.cpi; i--) {
+    if (act.every(p => p.x >= cps[i].x * T - T)) { W.cpi = i; break; }
+  }
+}
+// Shared screen: the camera follows the group and nobody can leave the view.
+function updateCamera(W) {
+  const act = [...W.players.values()].filter(p => !p.entered);
+  const maxCam = W.L.w * T - VW;
+  if (act.length) {
+    let mn = Infinity, mx = -Infinity;
+    for (const p of act) { mn = Math.min(mn, p.x); mx = Math.max(mx, p.x + p.w); }
+    let t = (mn + mx) / 2 - VW / 2;
+    const lo = mx + 48 - VW, hi = mn - 48;
+    if (lo <= hi) t = Math.max(lo, Math.min(hi, t));
+    t = Math.max(0, Math.min(maxCam, t));
+    if (!W.camInit) { W.cam = t; W.camInit = true; } else W.cam += (t - W.cam) * 0.2;
+  }
+  for (const p of act) {
+    if (p.x < W.cam) moveX(W, p, W.cam - p.x);
+    else if (p.x + p.w > W.cam + VW) moveX(W, p, W.cam + VW - p.x - p.w);
+  }
+}
+
+function step(W) {
+  if (W.phase !== 'play') { W.timer += DT; return; }
+  W.frame++;
+  const act = [...W.players.values()].filter(p => !p.entered);
+  for (const pf of W.plats) updatePlat(W, pf, act.length);
+  for (const b of W.boxes) updateBox(W, b);
+  for (const p of act) if (!p.entered) updatePlayer(W, p);
+  updatePlates(W);
+  updateGates(W);
+  updateKeyDoor(W);
+  updateCheckpoints(W);
+  updateCamera(W);
+  const left = [...W.players.values()].filter(p => !p.entered).length;
+  if (W.players.size > 0 && left === 0) {
+    W.phase = W.li === LEVELS.length - 1 ? 'won' : 'clear';
+    W.timer = 0;
+  }
+}
+
+function snapshot(W) {
+  const r = v => Math.round(v * 10) / 10;
+  return {
+    t: 's', f: W.frame, li: W.li, ph: W.phase, tm: r(W.timer), cam: r(W.cam), n: W.players.size,
+    p: [...W.players.values()].map(p => [p.id, r(p.x), r(p.y), p.face, p.entered ? 1 : 0, p.ground ? 1 : 0]),
+    b: W.boxes.map(b => [r(b.x), r(b.y), b.pc]),
+    pf: W.plats.map(f => [r(f.x), r(f.y), f.aboard]),
+    ps: W.plateState, pi: W.plateInfo, gs: W.gateState,
+    k: W.key ? [r(W.key.x), r(W.key.y), W.key.carrier, W.key.used ? 1 : 0] : null,
+    du: W.door.unlocked ? 1 : 0
+  };
+}
+// ===== SIM-END =====
+
+// ---------------------------------------------------------------- UI / render
+const COLORS = ['#ff5a5f', '#3d8bff', '#ffc93c', '#34c77b', '#ff8c42', '#a66cff'];
+const GATE_COLORS = { '1': '#ff5a5f', '2': '#3d8bff', '3': '#ff8c42', '4': '#34c77b', '5': '#a66cff' };
+const PREFIX = 'huddlehop-v1-';
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+let scale = 1, offX = 0, offY = 0;
+
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.floor(innerWidth * dpr); cv.height = Math.floor(innerHeight * dpr);
+  scale = Math.min(cv.width / VW, cv.height / VH);
+  offX = (cv.width - VW * scale) / 2; offY = (cv.height - VH * scale) / 2;
+}
+addEventListener('resize', resize); resize();
+
+function toast(msg, ms = 2600) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+function show(id) {
+  for (const s of ['menu', 'lobby']) $(s).classList.toggle('hidden', s !== id);
+  const inGame = id === 'game';
+  $('hud').classList.toggle('hidden', !inGame);
+  $('touch').classList.toggle('hidden', !(inGame && ('ontouchstart' in window)));
+  App.screen = id;
+}
+
+const App = { screen: 'menu', mode: null, W: null, roster: [], code: '', startLevel: 0,
+  myId: null, ctrl: 0, snaps: [], staticWorlds: {} };
+
+function staticWorld(li) { return App.staticWorlds[li] || (App.staticWorlds[li] = buildWorld(li, [])); }
+function rosterEntry(id) { return App.roster.find(r => r.id === id); }
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawBlob(x, y, color, face, name, me, t, moving) {
+  const w = PW, h = PH;
+  const bob = moving ? Math.abs(Math.sin(t * 14)) * 1.5 : 0;
+  ctx.fillStyle = '#2d2a3e';
+  ctx.beginPath(); ctx.ellipse(x + 8, y + h, 6, 3, 0, 0, 7); ctx.ellipse(x + w - 8, y + h, 6, 3, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(x + w / 2, y - bob + 2); ctx.quadraticCurveTo(x + w / 2 - face * 4, y - 6 - bob, x + w / 2 - face * 2, y - 9 - bob); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x + w / 2 - face * 2, y - 10 - bob, 3.5, 0, 7); ctx.fill(); ctx.stroke();
+  roundRect(x, y - bob, w, h - 2 + bob, 10); ctx.fillStyle = color; ctx.fill(); ctx.stroke();
+  const ex = x + w / 2 + face * 4;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.ellipse(ex - 5, y + 11 - bob, 3.6, 4.6, 0, 0, 7); ctx.ellipse(ex + 5, y + 11 - bob, 3.6, 4.6, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2d2a3e';
+  ctx.beginPath(); ctx.arc(ex - 5 + face * 1.3, y + 12 - bob, 2, 0, 7); ctx.arc(ex + 5 + face * 1.3, y + 12 - bob, 2, 0, 7); ctx.fill();
+  ctx.font = '600 12px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#2d2a3e';
+  const ny = y - 16 - bob;
+  ctx.strokeText(name, x + w / 2, ny); ctx.fillText(name, x + w / 2, ny);
+  if (me) {
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.moveTo(x + w / 2 - 5, ny - 16); ctx.lineTo(x + w / 2 + 5, ny - 16); ctx.lineTo(x + w / 2, ny - 10); ctx.closePath();
+    ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#2d2a3e'; ctx.stroke();
+  }
+}
+
+function drawKey(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.lineWidth = 2.5; ctx.strokeStyle = '#2d2a3e'; ctx.fillStyle = '#ffc93c';
+  ctx.beginPath(); ctx.rect(-1, -3, 14, 6); ctx.rect(8, 3, 3, 5); ctx.rect(3, 3, 3, 4); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-6, 0, 7, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#2d2a3e'; ctx.beginPath(); ctx.arc(-6, 0, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// Builds a render view either from the live world (host) or interpolated snapshots (client).
+function viewFromWorld(W) {
+  return { li: W.li, L: W.L, gateCells: W.gateCells, cam: W.cam, phase: W.phase, timer: W.timer, n: W.players.size,
+    players: [...W.players.values()].map(p => ({ id: p.id, slot: p.slot, name: p.name, x: p.x, y: p.y, face: p.face,
+      entered: p.entered, moving: p.ground && dirOf(p) !== 0 })),
+    boxes: W.boxes.map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, need: needFor(b.need, W.players.size), pc: b.pc })),
+    plats: W.plats.map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h, mode: f.mode, aboard: f.aboard })),
+    plateState: W.plateState, plateInfo: W.plateInfo, gateState: W.gateState,
+    key: W.key ? { x: W.key.x, y: W.key.y, carried: W.key.carrier != null, used: W.key.used } : null,
+    door: W.door, cpi: W.cpi };
+}
+function viewFromSnaps() {
+  const s = App.snaps;
+  if (!s.length) return null;
+  const b = s[s.length - 1], a = s.length > 1 ? s[s.length - 2] : b;
+  const span = Math.max(1, b.at - a.at);
+  const al = Math.max(0, Math.min(1, (performance.now() - b.at) / span));
+  const lerp = (u, v) => u + (v - u) * al;
+  const S = staticWorld(b.m.li), m = b.m, pm = a.m.li === m.li ? a.m : m;
+  const prevP = new Map(pm.p.map(q => [q[0], q]));
+  return { li: m.li, L: S.L, gateCells: S.gateCells, cam: lerp(pm.cam, m.cam), phase: m.ph, timer: m.tm, n: m.n,
+    players: m.p.map(q => {
+      const o = prevP.get(q[0]) || q, r = rosterEntry(q[0]) || { slot: 0, name: '?' };
+      return { id: q[0], slot: r.slot, name: r.name, x: lerp(o[1], q[1]), y: lerp(o[2], q[2]), face: q[3],
+        entered: !!q[4], moving: !!q[5] && Math.abs(q[1] - o[1]) > 0.5 };
+    }),
+    boxes: m.b.map((q, i) => ({ x: lerp((pm.b[i] || q)[0], q[0]), y: lerp((pm.b[i] || q)[1], q[1]),
+      w: S.boxes[i].w, h: S.boxes[i].h, need: needFor(S.boxes[i].need, m.n), pc: q[2] })),
+    plats: m.pf.map((q, i) => ({ x: lerp((pm.pf[i] || q)[0], q[0]), y: lerp((pm.pf[i] || q)[1], q[1]),
+      w: S.plats[i].w, h: S.plats[i].h, mode: S.plats[i].mode, aboard: q[2] })),
+    plateState: m.ps, plateInfo: m.pi, gateState: m.gs,
+    key: m.k ? { x: m.k[0], y: m.k[1], carried: m.k[2] != null, used: !!m.k[3] } : null,
+    door: Object.assign({}, S.door, { unlocked: !!m.du }), cpi: m.cp };
+}
+
+function plateColor(L, id) {
+  for (const g in L.gates) if (L.gates[g].by.includes(id)) return GATE_COLORS[g] || '#2d2a3e';
+  return '#2d2a3e';
+}
+
+function render(V, t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#d6e9e2'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(scale, 0, 0, scale, offX, offY);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, VW, VH); ctx.clip();
+  ctx.fillStyle = '#e6f2ee'; ctx.fillRect(0, 0, VW, VH);
+  if (!V) { ctx.restore(); return; }
+  const L = V.L, cam = V.cam;
+  // parallax hills and clouds
+  ctx.fillStyle = '#d3e8df';
+  for (let i = -1; i < 8; i++) { const hx = i * 260 - (cam * 0.3) % 260; ctx.beginPath(); ctx.ellipse(hx, VH - 40, 170, 120, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#ffffff';
+  for (let i = -1; i < 6; i++) { const cx = i * 300 - (cam * 0.15) % 300 + 60, cy = 70 + (i & 1) * 50;
+    ctx.beginPath(); ctx.ellipse(cx, cy, 44, 16, 0, 0, 7); ctx.ellipse(cx + 30, cy - 8, 30, 14, 0, 0, 7); ctx.fill(); }
+  ctx.translate(-Math.round(cam), 0);
+  const c0 = Math.max(0, Math.floor(cam / T)), c1 = Math.min(L.w - 1, Math.ceil((cam + VW) / T));
+  const solidAt = (i, j) => j >= 0 && j < ROWS && i >= 0 && i < L.w && L.g[j][i] === '#';
+  // tiles
+  for (let j = 0; j < ROWS; j++) for (let i = c0; i <= c1; i++) {
+    if (L.g[j][i] !== '#') continue;
+    const x = i * T, y = j * T;
+    ctx.fillStyle = '#3f3b5c'; ctx.fillRect(x, y, T, T);
+    if (!solidAt(i, j - 1)) { ctx.fillStyle = '#6a64a0'; ctx.fillRect(x, y, T, 6); }
+    ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(x + 4, y + 10, T - 8, 3);
+  }
+  // gates
+  for (const id in V.gateCells) {
+    const g = L.gates[id]; if (!g) continue;
+    const active = V.gateState[id];
+    const solid = g.mode === 'open' ? !active : active;
+    const col = GATE_COLORS[id] || '#888';
+    for (const [i, j] of V.gateCells[id]) {
+      if (i < c0 - 1 || i > c1 + 1) continue;
+      const x = i * T, y = j * T;
+      if (solid) {
+        ctx.fillStyle = col; ctx.fillRect(x, y, T, T);
+        ctx.fillStyle = 'rgba(45,42,62,.22)';
+        ctx.beginPath(); ctx.moveTo(x, y + T); ctx.lineTo(x + T / 2, y); ctx.lineTo(x + T, y); ctx.lineTo(x + T / 2, y + T); ctx.fill();
+        ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, T - 2, T - 2);
+      } else {
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = 0.6;
+        ctx.strokeRect(x + 3, y + 3, T - 6, T - 6); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    }
+  }
+  // checkpoints
+  L.checkpoints.forEach((c, i) => {
+    const x = c.x * T + 14, y = (c.y + 1) * T;
+    ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 40); ctx.stroke();
+    ctx.fillStyle = i <= V.cpi ? '#34c77b' : '#ffffff';
+    ctx.beginPath(); ctx.moveTo(x, y - 40); ctx.lineTo(x + 18, y - 33); ctx.lineTo(x, y - 26); ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 2; ctx.stroke();
+  });
+  // plates
+  ctx.textAlign = 'center';
+  for (const id in L.plates) {
+    const pl = L.plates[id], on = V.plateState[id], info = V.plateInfo[id] || [0, 1];
+    const x = pl.x * T + 3, y = (pl.y + 1) * T, w = pl.w * T - 6, hh = on ? 4 : 8;
+    ctx.fillStyle = on ? '#34c77b' : plateColor(L, id);
+    roundRect(x, y - hh, w, hh + 2, 3); ctx.fill();
+    ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 2; ctx.stroke();
+    if (info[1] > 1 || !on) {
+      ctx.font = '700 14px Fredoka, sans-serif';
+      const label = pl.latch && on ? '✓' : `${Math.min(info[0], info[1])}/${info[1]}`;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#2d2a3e';
+      ctx.strokeText(label, x + w / 2, y - 14); ctx.fillText(label, x + w / 2, y - 14);
+    }
+  }
+  // door
+  const d = V.door;
+  roundRect(d.x - 4, d.y, d.w + 8, d.h, 14);
+  ctx.fillStyle = d.unlocked ? '#fff3c4' : '#3f3b5c'; ctx.fill();
+  ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 3; ctx.stroke();
+  if (!d.unlocked) {
+    ctx.fillStyle = '#ffc93c';
+    ctx.beginPath(); ctx.arc(d.x + d.w / 2, d.y + 26, 5, 0, 7); ctx.fill();
+    ctx.fillRect(d.x + d.w / 2 - 2, d.y + 28, 4, 10);
+  } else {
+    ctx.fillStyle = 'rgba(255,201,60,.35)'; ctx.beginPath(); ctx.arc(d.x + d.w / 2, d.y + d.h / 2, 30 + Math.sin(t * 4) * 3, 0, 7); ctx.fill();
+  }
+  // platforms
+  for (const f of V.plats) {
+    roundRect(f.x, f.y, f.w, f.h, 6); ctx.fillStyle = '#ff8c42'; ctx.fill();
+    ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    for (let k = 10; k < f.w - 10; k += 22) { ctx.beginPath(); ctx.moveTo(f.x + k, f.y + 10); ctx.lineTo(f.x + k + 6, f.y + 16); ctx.lineTo(f.x + k, f.y + 22); ctx.fill(); }
+    if (f.mode === 'all') {
+      const need = V.players.filter(p => !p.entered).length;
+      const lab = `${f.aboard}/${need}`;
+      ctx.font = '700 14px Fredoka, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#2d2a3e';
+      ctx.strokeText(lab, f.x + f.w / 2, f.y + f.h + 18); ctx.fillText(lab, f.x + f.w / 2, f.y + f.h + 18);
+    }
+  }
+  // boxes
+  for (const b of V.boxes) {
+    roundRect(b.x, b.y, b.w, b.h, 6); ctx.fillStyle = '#d9a86c'; ctx.fill();
+    ctx.strokeStyle = '#2d2a3e'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = 'rgba(45,42,62,.35)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.x + 8, b.y + 8); ctx.lineTo(b.x + b.w - 8, b.y + b.h - 8); ctx.moveTo(b.x + b.w - 8, b.y + 8); ctx.lineTo(b.x + 8, b.y + b.h - 8); ctx.stroke();
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.fillStyle = '#2d2a3e';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#d9a86c';
+    const lab = `${Math.min(b.pc, b.need)}/${b.need}`;
+    ctx.strokeText(lab, b.x + b.w / 2, b.y + b.h / 2 + 6); ctx.fillText(lab, b.x + b.w / 2, b.y + b.h / 2 + 6);
+  }
+  // key (loose)
+  if (V.key && !V.key.used && !V.key.carried) drawKey(V.key.x + 3, V.key.y + Math.sin(t * 3) * 3);
+  // players
+  const me = App.mode === 'host' ? hostControlledId() : App.myId;
+  for (const p of V.players) {
+    if (p.entered) continue;
+    drawBlob(p.x, p.y, COLORS[p.slot % 6], p.face, p.name, p.id === me, t, p.moving);
+  }
+  if (V.key && !V.key.used && V.key.carried) drawKey(V.key.x + 3, V.key.y - 20);
+  ctx.restore();
+  // banners
+  ctx.setTransform(scale, 0, 0, scale, offX, offY);
+  if (V.phase === 'clear' || V.phase === 'won') {
+    ctx.fillStyle = 'rgba(230,242,238,.75)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#2d2a3e';
+    ctx.font = '700 84px Fredoka, sans-serif';
+    ctx.fillText(V.phase === 'won' ? 'Park complete!' : 'Clear!', VW / 2, VH / 2);
+    ctx.font = '500 24px Fredoka, sans-serif';
+    ctx.fillText(V.phase === 'won' ? 'Every level, together. Host can return to the lobby.' : 'Next level coming up…', VW / 2, VH / 2 + 46);
+  }
+}
+
+// ---------------------------------------------------------------- input
+const keys = { l: 0, r: 0, j: 0 };
+const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'j', KeyW: 'j', Space: 'j' };
+function typing() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); }
+function setKey(k, v) {
+  if (keys[k] === v) return;
+  keys[k] = v;
+  if (App.mode === 'client') sendInput();
+}
+addEventListener('keydown', e => {
+  if (App.screen !== 'game' || typing()) return;
+  if (e.code === 'Tab' && App.mode === 'host') { e.preventDefault(); cycleControl(); return; }
+  const k = KEYMAP[e.code]; if (!k) return;
+  e.preventDefault(); setKey(k, 1);
+});
+addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) setKey(k, 0); });
+addEventListener('blur', () => { setKey('l', 0); setKey('r', 0); setKey('j', 0); });
+document.querySelectorAll('#touch button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); setKey(k, 1); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => setKey(k, 0));
+});
+
+// ---------------------------------------------------------------- networking (PeerJS, host-authoritative)
+const Net = { peer: null, conns: new Map(), hostConn: null, seq: 0, lastSend: 0 };
+const randCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)]).join('');
+function myName() { return ($('nameIn').value.trim() || 'Player').slice(0, 12); }
+function saveName() { try { localStorage.setItem('hh-name', myName()); } catch (e) {} }
+function broadcast(msg) { for (const c of Net.conns.values()) if (c.open) c.send(msg); }
+function freeSlot() { for (let s = 0; s < MAX_PLAYERS; s++) if (!App.roster.some(r => r.slot === s)) return s; return -1; }
+
+function hostRoom() {
+  if (typeof Peer === 'undefined') { $('menuErr').textContent = 'Could not load the networking library. Check your connection and reload.'; return; }
+  saveName();
+  $('menuErr').textContent = 'Creating room…';
+  const code = randCode();
+  const peer = new Peer(PREFIX + code, { debug: 1 });
+  Net.peer = peer;
+  peer.on('open', () => {
+    App.mode = 'host'; App.code = code; App.myId = 'h';
+    App.roster = [{ id: 'h', name: myName(), slot: 0 }];
+    $('menuErr').textContent = '';
+    enterLobby();
+  });
+  peer.on('connection', conn => {
+    conn.on('data', d => hostOnData(conn, d));
+    conn.on('close', () => hostDrop(conn));
+    conn.on('error', () => hostDrop(conn));
+  });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id') { peer.destroy(); hostRoom(); return; }
+    if (App.screen === 'menu') $('menuErr').textContent = 'Could not create a room (' + e.type + '). Try again.';
+    else toast('Network: ' + e.type);
+  });
+  peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+}
+
+function hostOnData(conn, d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'hello') {
+    const slot = freeSlot();
+    if (slot < 0) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 300); return; }
+    const id = 'c' + (++Net.seq);
+    conn._pid = id;
+    Net.conns.set(id, conn);
+    const r = { id, name: String(d.name || 'Player').slice(0, 12), slot };
+    App.roster.push(r);
+    conn.send({ t: 'welcome', id, code: App.code });
+    if (App.W) { addPlayer(App.W, r); conn.send({ t: 'start', li: App.W.li }); }
+    sendLobby();
+    toast(r.name + ' joined');
+  } else if (d.t === 'in' && conn._pid && App.W) {
+    const p = App.W.players.get(conn._pid);
+    if (p) p.in = { l: d.l ? 1 : 0, r: d.r ? 1 : 0, j: d.j ? 1 : 0 };
+  }
+}
+function hostDrop(conn) {
+  const id = conn._pid; if (!id || !Net.conns.has(id)) return;
+  Net.conns.delete(id);
+  const r = rosterEntry(id);
+  App.roster = App.roster.filter(x => x.id !== id);
+  if (App.W) App.W.players.delete(id);
+  sendLobby();
+  if (r) toast(r.name + ' left');
+}
+function sendLobby() {
+  broadcast({ t: 'lobby', roster: App.roster, code: App.code });
+  if (App.screen === 'lobby') renderLobby();
+}
+
+function joinRoom() {
+  if (typeof Peer === 'undefined') { $('menuErr').textContent = 'Could not load the networking library. Check your connection and reload.'; return; }
+  const code = $('codeIn').value.trim().toUpperCase();
+  if (!/^[A-Z]{5}$/.test(code)) { $('menuErr').textContent = 'Room codes are 5 letters.'; return; }
+  saveName();
+  $('menuErr').textContent = 'Joining ' + code + '…';
+  const peer = new Peer({ debug: 1 });
+  Net.peer = peer;
+  const fail = msg => { $('menuErr').textContent = msg; try { peer.destroy(); } catch (e) {} };
+  const timer = setTimeout(() => { if (App.mode !== 'client') fail('No answer from room ' + code + '. Check the code, or the host may be behind a strict network.'); }, 12000);
+  peer.on('open', () => {
+    const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
+    Net.hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'hello', name: myName() }));
+    conn.on('data', d => clientOnData(d, timer));
+    conn.on('close', () => { if (App.mode === 'client') { toast('The host closed the room.', 4000); resetToMenu(); } });
+  });
+  peer.on('error', e => {
+    if (e.type === 'peer-unavailable') fail('Room ' + code + ' not found.');
+    else if (App.mode !== 'client') fail('Could not connect (' + e.type + ').');
+    else toast('Network: ' + e.type);
+  });
+}
+function clientOnData(d, timer) {
+  if (!d || typeof d !== 'object') return;
+  switch (d.t) {
+    case 'welcome': clearTimeout(timer); App.mode = 'client'; App.myId = d.id; App.code = d.code; $('menuErr').textContent = ''; enterLobby(); break;
+    case 'full': $('menuErr').textContent = 'That room already has 6 players.'; break;
+    case 'lobby': App.roster = d.roster; App.code = d.code; if (App.screen === 'lobby') renderLobby(); break;
+    case 'start': App.snaps = []; enterGame(d.li); break;
+    case 'tolobby': App.snaps = []; enterLobby(); break;
+    case 's':
+      App.snaps.push({ at: performance.now(), m: d });
+      if (App.snaps.length > 3) App.snaps.shift();
+      if (App.screen !== 'game') enterGame(d.li);
+      break;
+  }
+}
+function sendInput() {
+  const c = Net.hostConn;
+  if (c && c.open) { c.send({ t: 'in', l: keys.l, r: keys.r, j: keys.j }); Net.lastSend = performance.now(); }
+}
+
+function resetToMenu() {
+  try { Net.peer && Net.peer.destroy(); } catch (e) {}
+  Net.peer = null; Net.conns.clear(); Net.hostConn = null;
+  App.mode = null; App.W = null; App.roster = []; App.snaps = [];
+  show('menu');
+}
+
+// ---------------------------------------------------------------- lobby & game flow
+function enterLobby() { App.W = null; show('lobby'); renderLobby(); }
+function renderLobby() {
+  $('lobCode').textContent = App.code;
+  const ul = $('roster'); ul.innerHTML = '';
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    const r = App.roster.find(x => x.slot === s);
+    const li = document.createElement('li');
+    const dot = document.createElement('span'); dot.className = 'dot';
+    dot.style.background = r ? COLORS[s] : 'transparent'; dot.style.opacity = r ? 1 : .3;
+    const nm = document.createElement('span'); nm.textContent = r ? r.name : 'Open spot';
+    if (!r) li.style.opacity = .5;
+    li.append(dot, nm);
+    if (r) {
+      const tag = document.createElement('span'); tag.className = 'tag';
+      tag.textContent = r.id === 'h' ? 'host' : r.local ? 'test player' : r.id === App.myId ? 'you' : '';
+      li.append(tag);
+      if (r.local && App.mode === 'host') {
+        const x = document.createElement('button'); x.textContent = '✕'; x.style.cssText = 'padding:0 8px;font-size:14px;box-shadow:none';
+        x.setAttribute('aria-label', 'Remove test player');
+        x.onclick = () => { App.roster = App.roster.filter(q => q !== r); sendLobby(); };
+        li.append(x);
+      }
+    }
+    ul.append(li);
+  }
+  const host = App.mode === 'host';
+  $('hostOnly').classList.toggle('hidden', !host);
+  $('waitNote').classList.toggle('hidden', host);
+  if (host) {
+    const pick = $('lvPick'); pick.innerHTML = '';
+    LEVELS.forEach((_, i) => {
+      const b = document.createElement('button'); b.textContent = i + 1;
+      if (i === App.startLevel) b.classList.add('on');
+      b.onclick = () => { App.startLevel = i; renderLobby(); };
+      pick.append(b);
+    });
+    const humans = App.roster.filter(r => !r.local).length;
+    $('addBot').disabled = App.roster.length >= MAX_PLAYERS;
+    $('lobNote').textContent = humans < 3
+      ? `${humans} of 3 players so far. Puzzles need at least 3 bodies; add test players to try levels alone (Tab switches who you control).`
+      : `${App.roster.length} players ready. Puzzles scale to your group size.`;
+  }
+}
+function enterGame(li) {
+  const S = staticWorld(li);
+  $('hudLvl').textContent = `Level ${li + 1}: ${S.L.name}`;
+  $('hudHint').textContent = S.L.hint;
+  $('hudCode').textContent = 'Room ' + App.code;
+  const host = App.mode === 'host';
+  for (const id of ['hRestart', 'hSkip', 'hLobby']) $(id).classList.toggle('hidden', !host);
+  show('game');
+  updateCtrlPill();
+}
+function hostStartLevel(li) {
+  App.W = buildWorld(li, App.roster);
+  App.ctrl = 0;
+  broadcast({ t: 'start', li });
+  enterGame(li);
+}
+function hostToLobby() { App.W = null; broadcast({ t: 'tolobby' }); enterLobby(); }
+function controllable() { return App.roster.filter(r => r.id === 'h' || r.local).map(r => r.id); }
+function hostControlledId() { const c = controllable(); return c[App.ctrl % c.length]; }
+function cycleControl() { App.ctrl = (App.ctrl + 1) % controllable().length; updateCtrlPill(); }
+function updateCtrlPill() {
+  const pill = $('hudCtrl');
+  const many = App.mode === 'host' && controllable().length > 1;
+  pill.classList.toggle('hidden', !many);
+  if (many) { const r = rosterEntry(hostControlledId()); pill.textContent = 'Tab: playing as ' + (r ? r.name : '?'); pill.style.background = r ? COLORS[r.slot] : '#fff'; }
+}
+
+// Host simulation runs off a worker timer so a background tab keeps ticking better than rAF would.
+let acc = 0, lastTick = performance.now(), tickCount = 0;
+function hostTick() {
+  const now = performance.now();
+  acc += Math.min(0.25, (now - lastTick) / 1000); lastTick = now;
+  const W = App.W;
+  if (App.mode !== 'host' || !W) { acc = 0; return; }
+  while (acc >= DT) {
+    acc -= DT;
+    const cid = hostControlledId();
+    for (const r of App.roster) {
+      if (r.id !== 'h' && !r.local) continue;
+      const p = W.players.get(r.id);
+      if (p) p.in = r.id === cid ? { l: keys.l, r: keys.r, j: keys.j } : { l: 0, r: 0, j: 0 };
+    }
+    step(W);
+    if (W.phase === 'clear' && W.timer > 2.5) { hostStartLevel(W.li + 1); return; }
+    if (++tickCount % 2 === 0) broadcast(snapshot(W));
+  }
+}
+try {
+  const src = 'setInterval(function(){postMessage(0)},1000/60)';
+  const wk = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  wk.onmessage = hostTick;
+} catch (e) { setInterval(hostTick, 1000 / 60); }
+
+// Clients re-send input a few times a second in case a packet raced a level change.
+setInterval(() => { if (App.mode === 'client' && App.screen === 'game' && performance.now() - Net.lastSend > 300) sendInput(); }, 300);
+
+function frameLoop(ts) {
+  const t = ts / 1000;
+  if (App.screen === 'game') {
+    const V = App.mode === 'host' ? (App.W && viewFromWorld(App.W)) : viewFromSnaps();
+    render(V, t);
+  } else {
+    renderMenuScene(t);
+  }
+  requestAnimationFrame(frameLoop);
+}
+
+// Menu backdrop: a little tower of blobs.
+function renderMenuScene(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#e6f2ee'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(scale, 0, 0, scale, offX, offY);
+  ctx.fillStyle = '#3f3b5c'; ctx.fillRect(-2000, VH - 48, VW + 4000, 400);
+  ctx.fillStyle = '#6a64a0'; ctx.fillRect(-2000, VH - 48, VW + 4000, 6);
+  const baseY = VH - 48 - PH;
+  for (let i = 0; i < 6; i++) {
+    const col = i % 3, lvl = i < 3 ? 0 : (i < 5 ? 1 : 2);
+    const x = 90 + (lvl === 0 ? col * 32 : lvl === 1 ? 16 + (i - 3) * 32 : 32);
+    const hop = lvl === 2 ? Math.max(0, Math.sin(t * 3)) * 26 : 0;
+    drawBlob(x, baseY - lvl * PH - hop, COLORS[i], 1, '', false, t, false);
+  }
+}
+
+// ---------------------------------------------------------------- wiring
+$('hostBtn').onclick = hostRoom;
+$('joinBtn').onclick = joinRoom;
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+$('leaveBtn').onclick = () => { if (App.mode === 'host') broadcast({ t: 'tolobby' }); resetToMenu(); };
+$('copyBtn').onclick = () => {
+  const url = location.origin + location.pathname + '?room=' + App.code;
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Invite link copied')).catch(() => toast(url, 6000));
+};
+$('addBot').onclick = () => {
+  const slot = freeSlot(); if (slot < 0) return;
+  const n = App.roster.filter(r => r.local).length + 1;
+  App.roster.push({ id: 'L' + Date.now() + n, name: 'Test ' + n, slot, local: true });
+  sendLobby();
+};
+$('startBtn').onclick = () => hostStartLevel(App.startLevel);
+$('hRestart').onclick = () => { if (App.W) hostStartLevel(App.W.li); };
+$('hSkip').onclick = () => { if (App.W) App.W.li < LEVELS.length - 1 ? hostStartLevel(App.W.li + 1) : toast('This is the last level'); };
+$('hLobby').onclick = hostToLobby;
+try { $('nameIn').value = localStorage.getItem('hh-name') || ''; } catch (e) {}
+const qRoom = new URLSearchParams(location.search).get('room');
+if (qRoom) { $('codeIn').value = qRoom.toUpperCase().slice(0, 5); $('menuErr').textContent = 'Enter your name, then tap Join.'; }
+addEventListener('beforeunload', () => { try { Net.peer && Net.peer.destroy(); } catch (e) {} });
+requestAnimationFrame(frameLoop);
+</script>
+</body>
+</html>
