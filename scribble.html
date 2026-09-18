@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scribble — draw and guess, up to 12 players</title>
+<title>Scribble — draw and guess, up to 20 players</title>
 <style>
   :root {
     --bg:#2b2f77; --bg2:#1b1e52;
@@ -78,7 +78,11 @@
   .panel { background:var(--panel); border-radius:10px; box-shadow:var(--shadow); }
 
   /* players */
-  #players { padding:6px; display:flex; flex-direction:column; gap:4px; max-height:78vh; overflow:auto; }
+  #players {
+    padding:6px; display:grid; gap:4px; align-content:start;
+    grid-template-columns:repeat(auto-fill, minmax(178px, 1fr));   /* widen the rail and it packs into columns */
+    max-height:78vh; overflow:auto;
+  }
   #players:empty { display:none; }
   .pl { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:8px; background:var(--panel2); position:relative; }
   .pl.me { outline:2px solid var(--accent); }
@@ -88,7 +92,7 @@
          color:#fff; font-weight:700; font-size:13px; text-shadow:0 1px 1px rgba(0,0,0,.35); }
   .pl .who { flex:1 1 auto; min-width:0; }
   .pl .nm { display:block; font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .pl .sc { display:block; font-size:11px; color:var(--muted); }
+  .pl .sc { display:block; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .pl .tag { flex:0 0 auto; font-size:14px; }
   .pl .kick {
     flex:0 0 auto; border:0; background:transparent; cursor:pointer; color:var(--muted);
@@ -188,8 +192,8 @@
   @media (max-width: 1020px) {
     #board { grid-template-columns:minmax(0,1fr); }
     #railGrip { display:none; }                  /* the rail is a full-width row down here */
-    #players { flex-direction:row; flex-wrap:wrap; max-height:none; }
-    .pl { flex:1 1 150px; }
+    /* twenty rows would push the board off a phone screen, so the rail scrolls here */
+    #players { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); max-height:30vh; }
     #chatBox { height:320px; }
   }
   @media (prefers-reduced-motion: reduce) { #barFill { transition:none; } }
@@ -203,7 +207,7 @@
     <div class="hudBit" id="hRound">Round<b>—</b></div>
     <div id="hWord">
       <span id="wordMask">S C R I B B L E</span>
-      <span id="wordNote">Draw and guess with up to 12 players</span>
+      <span id="wordNote">Draw and guess with up to 20 players</span>
     </div>
     <div class="hudBit" id="clockWrap"><span id="clock">—</span></div>
   </header>
@@ -222,7 +226,7 @@
 
           <div class="card" id="cardMenu">
             <h2>Scribble</h2>
-            <p class="sub">One player draws, everyone else races to guess it. Up to 12 per room.</p>
+            <p class="sub">One player draws, everyone else races to guess it. Up to 20 per room.</p>
             <div class="row">
               <input id="fName" maxlength="14" placeholder="Your name" autocomplete="off" aria-label="Your name">
             </div>
@@ -251,6 +255,7 @@
               <div class="line"><label for="sOnly"><input type="checkbox" id="sOnly"> Use custom words only</label></div>
             </div>
             <p id="roster"></p>
+            <p class="sub" id="eta"></p>
             <div class="row"><button class="go big" id="bStart">Start game</button></div>
             <p class="note" id="lobbyNote"></p>
           </div>
@@ -304,7 +309,7 @@
 
 <script>
 /* =======================================================================
-   Scribble — a draw-and-guess party game for up to 12 players per lobby.
+   Scribble — a draw-and-guess party game for up to 20 players per lobby.
 
    Networking mirrors game.html: PeerJS star topology where the player who
    created the room is the authority. Guests only ever send intent (a chat
@@ -314,17 +319,20 @@
    pushing them down a wire.
    ======================================================================= */
 
-const MAX_PLAYERS  = 12;
+const MAX_PLAYERS  = 20;
 const ROOM_PREFIX  = 'scribble-v1-room-';
 const CW = 900, CH = 600;          // fixed board size, so strokes and fills replay identically everywhere
 const CHOOSE_TIME  = 15;           // seconds to pick a word
 const REVEAL_TIME  = 6;            // seconds on the scoreboard between turns
 const PEER_TIMEOUT = 15000;        // drop a guest we have not heard from in this long
 const HEARTBEAT    = 3000;
-const SEND_EVERY   = 50;           // ms between stroke packets
+const SEND_EVERY   = 50;           // ms between stroke packets in a quiet room
+const SEND_EVERY_BIG = 80;         // ... and in a crowded one: the host relays every packet to everybody
 
 const PIPS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db',
-              '#9b59b6','#e84393','#8d6e63','#607d8b','#00b894','#ff7675'];
+              '#9b59b6','#e84393','#8d6e63','#607d8b','#00b894','#ff7675',
+              '#c0392b','#a0522d','#b7950b','#117a65','#1f618d','#6c3483',
+              '#ad1457','#4e6e2e'];
 
 const PALETTE = ['#ffffff','#c1c1c1','#ef130b','#ff7100','#ffe400','#00cc00','#00b2ff','#231fd3','#a300ba','#d37caa','#a0522d',
                  '#000000','#4c4c4c','#740b07','#c23800','#e8a200','#005510','#00569e','#0e0865','#550069','#a75574','#63300d'];
@@ -434,7 +442,7 @@ function say(text, kind, who, colour) {
   }
   li.appendChild(document.createTextNode(text));
   log.appendChild(li);
-  while (log.children.length > 200) log.removeChild(log.firstChild);
+  while (log.children.length > 400) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
 
@@ -455,7 +463,7 @@ function renderHud() {
   if (G.phase === 'menu' || G.phase === 'lobby') {
     $('hRound').innerHTML = 'Room<b>' + (roomCode || '—') + '</b>';
     $('wordMask').textContent = 'S C R I B B L E';
-    $('wordNote').textContent = mode === 'off' ? 'Draw and guess with up to 12 players'
+    $('wordNote').textContent = mode === 'off' ? 'Draw and guess with up to 20 players'
                                                : G.players.length + ' of ' + MAX_PLAYERS + ' players in the room';
     $('clock').textContent = '—';
     $('barFill').style.width = '100%';
@@ -498,7 +506,7 @@ function renderPlayers() {
     nm.textContent = p.name + (p.id === me.id ? ' (you)' : '');
     const sc = document.createElement('span');
     sc.className = 'sc';
-    sc.textContent = '#' + (i + 1) + ' · ' + p.score + ' points' + (p.gain ? '  (+' + p.gain + ')' : '');
+    sc.textContent = '#' + (i + 1) + ' · ' + p.score + (p.gain ? ' (+' + p.gain + ')' : '');
     who.appendChild(nm); who.appendChild(sc);
     row.appendChild(who);
 
@@ -534,6 +542,10 @@ function renderLobby() {
   $('bStart').style.display = isHost ? '' : 'none';
   $('roster').textContent = G.players.length + ' of ' + MAX_PLAYERS + ' players: ' +
                             G.players.map(p => p.name).join(', ');
+  const turns = G.players.length * s.rounds;
+  const mins = Math.round(turns * (s.drawTime + 10 + REVEAL_TIME) / 60);
+  $('eta').textContent = turns + (turns === 1 ? ' turn' : ' turns') + ' — roughly ' + mins +
+                         (mins === 1 ? ' minute' : ' minutes') + ' at these settings.';
   $('lobbyNote').textContent = isHost
     ? (G.players.length < 2 ? 'Better with friends — you can start alone to practise.' : '')
     : 'Waiting for the host to start the game.';
@@ -659,7 +671,7 @@ const canDraw = () => G.phase === 'draw' && isDrawer();
 function flushStroke(force) {
   if (!stroke) return;
   const t = now();
-  if (!force && t - lastSend < SEND_EVERY) return;
+  if (!force && t - lastSend < (G.players.length > 10 ? SEND_EVERY_BIG : SEND_EVERY)) return;
   if (stroke.p.length <= sentPts) return;
   const from = Math.max(0, sentPts - 2);                 // repeat the last sent point to bridge the gap
   toHost({ t:'draw', id:stroke.id, c:stroke.c, w:stroke.w, p:stroke.p.slice(from) });
@@ -869,7 +881,9 @@ function hostScoreGuess(p) {
   p.gain = (p.gain || 0) + pts;
   H.gains[p.id] = pts;
   H.guessOrder.push(p.id);
-  broadcast({ t:'got', id:p.id, name:p.name, place:H.guessOrder.length, players:slim() });
+  /* Twenty players means twenty of these a turn, so send the one row that changed
+     rather than the whole table; the reveal packet resyncs everybody anyway. */
+  broadcast({ t:'got', id:p.id, name:p.name, place:H.guessOrder.length, score:p.score, gain:p.gain });
 
   const waiting = G.players.filter(q => q.id !== G.drawerId && !q.guessed).length;
   if (!waiting) hostEndTurn('everybody guessed it');
@@ -1060,11 +1074,13 @@ function onMessage(d) {
       G.time = d.v;
       renderHud();
       break;
-    case 'got':
-      G.players = d.players || G.players;
+    case 'got': {
+      const p = byId(d.id);
+      if (p) { p.guessed = true; p.score = d.score; p.gain = d.gain; }
       say(d.name + ' guessed the word!' + (d.place === 1 ? ' (first!)' : ''), 'good');
       render();
       break;
+    }
     case 'reveal': {
       G.phase = 'reveal'; G.players = d.players || G.players;
       G.time = d.time; G.total = d.time; G.pattern = d.word || '';
@@ -1513,7 +1529,7 @@ function init() {
   blankBoard();
   showCard('cardMenu');
   render();
-  say('Welcome to Scribble! Create a room, then share the code with up to 11 friends.', 'sys');
+  say('Welcome to Scribble! Create a room, then share the code with up to ' + (MAX_PLAYERS - 1) + ' friends.', 'sys');
 }
 init();
 </script>
