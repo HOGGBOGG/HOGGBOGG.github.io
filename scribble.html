@@ -59,9 +59,22 @@
 
   /* ---------- board ---------- */
   #board {
-    display:grid; grid-template-columns:200px minmax(0,1fr) 268px; gap:10px;
+    display:grid; grid-template-columns:var(--rail, 240px) 10px minmax(0,1fr) 268px; gap:10px;
     align-items:start; margin-top:10px;
   }
+  #railGrip {
+    align-self:stretch; min-height:64px; cursor:col-resize; touch-action:none;
+    display:grid; place-items:center; border-radius:6px;
+  }
+  #railGrip::after {
+    content:''; width:4px; height:46px; border-radius:2px;
+    background:rgba(255,255,255,.34); transition:background .12s ease, height .12s ease;
+  }
+  #railGrip:hover::after, #railGrip:focus-visible::after, #railGrip.drag::after {
+    background:var(--accent); height:76px;
+  }
+  #players:empty + #railGrip { display:none; }
+  body.sizing { user-select:none; cursor:col-resize; }
   .panel { background:var(--panel); border-radius:10px; box-shadow:var(--shadow); }
 
   /* players */
@@ -174,6 +187,7 @@
   }
   @media (max-width: 1020px) {
     #board { grid-template-columns:minmax(0,1fr); }
+    #railGrip { display:none; }                  /* the rail is a full-width row down here */
     #players { flex-direction:row; flex-wrap:wrap; max-height:none; }
     .pl { flex:1 1 150px; }
     #chatBox { height:320px; }
@@ -197,6 +211,9 @@
 
   <div id="board">
     <aside id="players" class="panel" aria-label="Players"></aside>
+    <div id="railGrip" role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="Resize the player list" title="Drag to resize — double-click to reset"
+         aria-valuemin="150" aria-valuemax="460" aria-valuenow="240"></div>
 
     <div id="stageCol">
       <div id="stage">
@@ -1334,6 +1351,56 @@ function showOver() {
 }
 
 /* =======================================================================
+   The player rail is draggable — with twelve people in a room the names
+   need more width than a phone-sized column gives them, and everyone's
+   taste differs, so the chosen width is remembered.
+   ======================================================================= */
+const RAIL_MIN = 150, RAIL_MAX = 460, RAIL_DEF = 240;
+let railW = RAIL_DEF, railDrag = null;
+
+function setRail(w, remember) {
+  railW = Math.round(clamp(w, RAIL_MIN, RAIL_MAX));
+  $('board').style.setProperty('--rail', railW + 'px');
+  $('railGrip').setAttribute('aria-valuenow', railW);
+  if (remember) { try { localStorage.setItem('scribble.rail', String(railW)); } catch (e) {} }
+}
+function wireRail() {
+  const grip = $('railGrip');
+  let saved = null;
+  try { saved = localStorage.getItem('scribble.rail'); } catch (e) {}
+  setRail(saved === null ? RAIL_DEF : +saved || RAIL_DEF, false);
+
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    railDrag = { x:e.clientX, w:railW };
+    grip.classList.add('drag');
+    document.body.classList.add('sizing');
+  });
+  grip.addEventListener('pointermove', e => {
+    if (railDrag) setRail(railDrag.w + (e.clientX - railDrag.x), false);
+  });
+  const stop = () => {
+    if (!railDrag) return;
+    railDrag = null;
+    grip.classList.remove('drag');
+    document.body.classList.remove('sizing');
+    setRail(railW, true);
+  };
+  grip.addEventListener('pointerup', stop);
+  grip.addEventListener('pointercancel', stop);
+  grip.addEventListener('dblclick', () => setRail(RAIL_DEF, true));
+  grip.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === 'ArrowLeft') setRail(railW - step, true);
+    else if (e.key === 'ArrowRight') setRail(railW + step, true);
+    else if (e.key === 'Home') setRail(RAIL_DEF, true);
+    else return;
+    e.preventDefault();
+  });
+}
+
+/* =======================================================================
    Menu, settings and wiring.
    ======================================================================= */
 function readSettings() {
@@ -1384,6 +1451,7 @@ function saveMe() {
 function init() {
   buildTools();
   buildSwatches();
+  wireRail();
   fillSelect($('sRounds'), [1,2,3,4,5,6,8,10]);
   fillSelect($('sTime'), [30,40,60,80,100,120,150,180], v => v + 's');
   fillSelect($('sHints'), [0,1,2,3,4,5]);
