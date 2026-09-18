@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scribble — draw and guess, up to 12 players</title>
+<style>
+  :root {
+    --bg:#2b2f77; --bg2:#1b1e52;
+    --panel:#ffffff; --panel2:#f5f6fa;
+    --ink:#1c1f27; --muted:#71778a; --line:#dde1ec;
+    --accent:#ffb92e; --go:#3f8ae0; --good:#2f9e56; --warn:#e07a2f; --bad:#d4553f;
+    --shadow:0 2px 0 rgba(0,0,0,.18), 0 10px 26px rgba(0,0,0,.22);
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    margin:0; padding:10px;
+    font-family:"Segoe UI", ui-sans-serif, system-ui, Roboto, Helvetica, Arial, sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #3a3f96 0%, transparent 60%),
+      linear-gradient(170deg, var(--bg) 0%, var(--bg2) 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  #shell { max-width:1300px; margin:0 auto; }
+
+  /* ---------- heads-up display ---------- */
+  #hud {
+    display:flex; align-items:center; gap:10px;
+    background:var(--panel); border-radius:10px 10px 0 0;
+    padding:8px 12px; box-shadow:var(--shadow);
+  }
+  .hudBit {
+    flex:0 0 auto; min-width:104px; text-align:center;
+    font-size:13px; font-weight:600; color:var(--muted);
+    line-height:1.25;
+  }
+  .hudBit b { display:block; font-size:19px; color:var(--ink); }
+  #hWord { flex:1 1 auto; text-align:center; min-width:0; }
+  #wordMask {
+    display:block; font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size:clamp(15px, 2.6vw, 25px); font-weight:700; letter-spacing:2px; line-height:1.4;
+    overflow-wrap:break-word;                    /* a long word must never be clipped — the drawer reads it here */
+  }
+  #wordNote { display:block; font-size:12px; color:var(--muted); min-height:1.1em; }
+  #clockWrap { display:flex; align-items:center; justify-content:center; gap:6px; }
+  #clock {
+    display:inline-grid; place-items:center; width:42px; height:42px; border-radius:50%;
+    background:var(--panel2); border:2px solid var(--line);
+    font-size:18px; font-weight:700; font-variant-numeric:tabular-nums;
+  }
+  #clock.low { border-color:var(--bad); color:var(--bad); }
+  #bar { height:5px; background:#e7eaf3; overflow:hidden; box-shadow:var(--shadow); }
+  #barFill { height:100%; width:100%; background:var(--go); transition:width .25s linear; }
+  #barFill.low { background:var(--bad); }
+
+  /* ---------- board ---------- */
+  #board {
+    display:grid; grid-template-columns:200px minmax(0,1fr) 268px; gap:10px;
+    align-items:start; margin-top:10px;
+  }
+  .panel { background:var(--panel); border-radius:10px; box-shadow:var(--shadow); }
+
+  /* players */
+  #players { padding:6px; display:flex; flex-direction:column; gap:4px; max-height:78vh; overflow:auto; }
+  #players:empty { display:none; }
+  .pl { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:8px; background:var(--panel2); position:relative; }
+  .pl.me { outline:2px solid var(--accent); }
+  .pl.guessed { background:#e4f6e9; }
+  .pl.drawing { background:#fff3d8; }
+  .pip { flex:0 0 auto; width:28px; height:28px; border-radius:50%; display:grid; place-items:center;
+         color:#fff; font-weight:700; font-size:13px; text-shadow:0 1px 1px rgba(0,0,0,.35); }
+  .pl .who { flex:1 1 auto; min-width:0; }
+  .pl .nm { display:block; font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pl .sc { display:block; font-size:11px; color:var(--muted); }
+  .pl .tag { flex:0 0 auto; font-size:14px; }
+  .pl .kick {
+    flex:0 0 auto; border:0; background:transparent; cursor:pointer; color:var(--muted);
+    font-size:14px; line-height:1; padding:3px 4px; border-radius:6px;
+  }
+  .pl .kick:hover { background:var(--bad); color:#fff; }
+
+  /* stage */
+  #stage { position:relative; background:#fff; border-radius:10px; box-shadow:var(--shadow); overflow:hidden; }
+  #pad { display:block; width:100%; height:auto; aspect-ratio:3/2; touch-action:none; background:#fff; cursor:default; }
+  #pad.draw { cursor:crosshair; }
+
+  /* tools */
+  #tools { margin-top:8px; padding:8px; display:none; gap:10px; align-items:center; flex-wrap:wrap; }
+  #tools.on { display:flex; }
+  #palette { display:grid; grid-template-columns:repeat(11, 1fr); gap:0; border-radius:6px; overflow:hidden; flex:1 1 300px; min-width:220px; }
+  #palette button { height:22px; border:0; padding:0; cursor:pointer; }
+  #palette button.on { outline:3px solid var(--accent); outline-offset:-3px; z-index:1; }
+  .sizes, .acts { display:flex; gap:6px; }
+  .sizes button, .acts button {
+    width:38px; height:38px; border-radius:8px; border:2px solid var(--line); background:var(--panel2);
+    cursor:pointer; display:grid; place-items:center; font-size:17px; color:var(--ink);
+  }
+  .sizes button.on, .acts button.on { border-color:var(--accent); background:#fff6e2; }
+  .sizes button:hover, .acts button:hover { border-color:var(--go); }
+  .dot { border-radius:50%; background:var(--ink); display:block; }
+  #inkPeek { width:38px; height:38px; border-radius:8px; border:2px solid var(--line); }
+
+  /* chat */
+  #chatBox { display:flex; flex-direction:column; height:min(78vh, 640px); }
+  #log { flex:1 1 auto; margin:0; padding:6px; list-style:none; overflow-y:auto; font-size:13px; line-height:1.4; }
+  #log li { padding:3px 6px; border-radius:6px; word-wrap:break-word; overflow-wrap:anywhere; }
+  #log li:nth-child(even) { background:var(--panel2); }
+  #log li.sys { color:var(--warn); font-weight:600; }
+  #log li.good { background:#dff3e4; color:#1d6b38; font-weight:600; }
+  #log li.close { background:#fdf0dd; color:#8a5210; font-weight:600; }
+  #log li.locked { background:#e9f8ee; color:#2a6b45; font-style:italic; }
+  #log li b { font-weight:700; }
+  #sayForm { display:flex; gap:6px; padding:6px; border-top:1px solid var(--line); }
+  #say { flex:1 1 auto; min-width:0; }
+
+  /* inputs + buttons */
+  input, select, textarea, button { font:inherit; color:inherit; }
+  input, select, textarea {
+    background:var(--panel2); border:2px solid var(--line); border-radius:8px; padding:7px 9px;
+  }
+  input:disabled, select:disabled, textarea:disabled { opacity:.55; }
+  button { border:0; border-radius:8px; padding:8px 12px; background:#e7eaf3; cursor:pointer; font-weight:600; }
+  button:hover:not(:disabled) { filter:brightness(1.05); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.go { background:var(--go); color:#fff; }
+  button.big { padding:11px 18px; font-size:16px; }
+  button.quiet { background:transparent; color:var(--muted); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* cards over the canvas */
+  #cards { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
+  #cards.dim { background:rgba(22,24,54,.62); }
+  .card {
+    display:none; pointer-events:auto; width:min(94%, 470px); max-height:94%; overflow:auto;
+    background:var(--panel); border-radius:12px; padding:16px 18px; text-align:center;
+    box-shadow:0 14px 40px rgba(0,0,0,.35);
+  }
+  .card.on { display:block; }
+  .card h2 { margin:0 0 4px; font-size:21px; }
+  .card .sub { margin:0 0 12px; color:var(--muted); font-size:13px; }
+  .card .row { display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  .card label { font-size:13px; color:var(--muted); display:inline-flex; align-items:center; gap:6px; }
+  .card .note { font-size:13px; color:var(--warn); min-height:1.2em; margin:8px 0 0; }
+  #fCode { width:120px; text-transform:uppercase; letter-spacing:4px; text-align:center; font-weight:700; }
+  #swatches { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin:10px 0; }
+  #swatches button { width:26px; height:26px; border-radius:50%; padding:0; border:3px solid transparent; }
+  #swatches button.on { border-color:var(--ink); }
+  #settings { display:grid; gap:8px; text-align:left; margin:10px 0; }
+  #settings .line { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+  #settings select { min-width:120px; }
+  #custom { width:100%; min-height:56px; resize:vertical; font-size:13px; }
+  #lobbyCode { font-family:ui-monospace, Consolas, monospace; letter-spacing:4px; color:var(--go); }
+  #roster { font-size:13px; color:var(--muted); margin:6px 0 0; }
+  #choiceRow button { background:var(--accent); font-size:16px; padding:11px 15px; }
+  #gains, #podium { text-align:left; margin:10px auto 0; max-width:300px; font-size:14px; }
+  #gains { list-style:none; padding:0; }
+  #gains li, #podium li { display:flex; justify-content:space-between; gap:10px; padding:4px 2px; border-bottom:1px solid var(--line); }
+  #podium { padding-left:22px; }
+  .plus { color:var(--good); font-weight:700; }
+  .zero { color:var(--muted); }
+  #revealWord { color:var(--go); font-style:normal; }
+  #foot { text-align:center; color:#b9bfe4; font-size:12px; margin:10px 0 4px; }
+  #foot a { color:#dfe3ff; }
+
+  @media (max-width: 620px) {                    /* on a phone the word gets a row to itself */
+    #hud { flex-wrap:wrap; row-gap:2px; }
+    #hWord { order:3; flex-basis:100%; }
+    .hudBit { min-width:70px; }
+    #wordMask { letter-spacing:1px; }
+  }
+  @media (max-width: 1020px) {
+    #board { grid-template-columns:minmax(0,1fr); }
+    #players { flex-direction:row; flex-wrap:wrap; max-height:none; }
+    .pl { flex:1 1 150px; }
+    #chatBox { height:320px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #barFill { transition:none; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div id="shell">
+
+  <header id="hud">
+    <div class="hudBit" id="hRound">Round<b>—</b></div>
+    <div id="hWord">
+      <span id="wordMask">S C R I B B L E</span>
+      <span id="wordNote">Draw and guess with up to 12 players</span>
+    </div>
+    <div class="hudBit" id="clockWrap"><span id="clock">—</span></div>
+  </header>
+  <div id="bar"><div id="barFill"></div></div>
+
+  <div id="board">
+    <aside id="players" class="panel" aria-label="Players"></aside>
+
+    <div id="stageCol">
+      <div id="stage">
+        <canvas id="pad" width="900" height="600" aria-label="Drawing board"></canvas>
+        <div id="cards" class="dim">
+
+          <div class="card" id="cardMenu">
+            <h2>Scribble</h2>
+            <p class="sub">One player draws, everyone else races to guess it. Up to 12 per room.</p>
+            <div class="row">
+              <input id="fName" maxlength="14" placeholder="Your name" autocomplete="off" aria-label="Your name">
+            </div>
+            <div id="swatches" aria-label="Pick your colour"></div>
+            <div class="row"><button class="go big" id="bHost">Create a room</button></div>
+            <div class="row">
+              <input id="fCode" maxlength="5" placeholder="CODE" autocomplete="off" aria-label="Room code">
+              <button id="bJoin">Join a room</button>
+            </div>
+            <p class="note" id="menuNote"></p>
+          </div>
+
+          <div class="card" id="cardLobby">
+            <h2>Room <span id="lobbyCode"></span></h2>
+            <p class="sub">Share the code (or the link) with your friends.</p>
+            <div class="row">
+              <button id="bCopy">Copy invite link</button>
+              <button class="quiet" id="bLeave">Leave room</button>
+            </div>
+            <div id="settings">
+              <div class="line"><label for="sRounds">Rounds</label><select id="sRounds"></select></div>
+              <div class="line"><label for="sTime">Seconds to draw</label><select id="sTime"></select></div>
+              <div class="line"><label for="sHints">Letter hints</label><select id="sHints"></select></div>
+              <div class="line"><label for="custom">Custom words (comma separated)</label></div>
+              <textarea id="custom" placeholder="pirate ship, Aunt Mabel, the dog next door" maxlength="2000"></textarea>
+              <div class="line"><label for="sOnly"><input type="checkbox" id="sOnly"> Use custom words only</label></div>
+            </div>
+            <p id="roster"></p>
+            <div class="row"><button class="go big" id="bStart">Start game</button></div>
+            <p class="note" id="lobbyNote"></p>
+          </div>
+
+          <div class="card" id="cardChoose">
+            <h2 id="chooseTitle">Choose a word</h2>
+            <p class="sub" id="chooseSub"></p>
+            <div class="row" id="choiceRow"></div>
+          </div>
+
+          <div class="card" id="cardReveal">
+            <h2>The word was <em id="revealWord"></em></h2>
+            <ul id="gains"></ul>
+          </div>
+
+          <div class="card" id="cardOver">
+            <h2>Final scores</h2>
+            <ol id="podium"></ol>
+            <div class="row"><button class="go big" id="bAgain">Back to the lobby</button></div>
+            <p class="note" id="overNote"></p>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="tools" class="panel">
+        <div id="inkPeek" title="Current colour"></div>
+        <div id="palette" role="group" aria-label="Colours"></div>
+        <div class="sizes" id="sizes" role="group" aria-label="Brush size"></div>
+        <div class="acts">
+          <button id="tBrush" class="on" title="Brush (B)" aria-label="Brush">✏️</button>
+          <button id="tFill" title="Fill (F)" aria-label="Fill">🪣</button>
+          <button id="tErase" title="Eraser (E)" aria-label="Eraser">🧽</button>
+          <button id="tUndo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+          <button id="tClear" title="Clear the board" aria-label="Clear">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <section id="chatBox" class="panel">
+      <ul id="log" aria-live="polite"></ul>
+      <form id="sayForm" autocomplete="off">
+        <input id="say" maxlength="120" placeholder="Type your guess here" aria-label="Guess or chat">
+        <button class="go" type="submit">Send</button>
+      </form>
+    </section>
+  </div>
+
+  <p id="foot">Peer-to-peer over WebRTC — the player who creates the room hosts the game. No server, no sign-up.</p>
+</div>
+
+<script>
+/* =======================================================================
+   Scribble — a draw-and-guess party game for up to 12 players per lobby.
+
+   Networking mirrors game.html: PeerJS star topology where the player who
+   created the room is the authority. Guests only ever send intent (a chat
+   line, a brush stroke, a word choice); the host decides what is true and
+   broadcasts it. The host runs the same client code as everyone else — it
+   just delivers its own messages straight into the handler instead of
+   pushing them down a wire.
+   ======================================================================= */
+
+const MAX_PLAYERS  = 12;
+const ROOM_PREFIX  = 'scribble-v1-room-';
+const CW = 900, CH = 600;          // fixed board size, so strokes and fills replay identically everywhere
+const CHOOSE_TIME  = 15;           // seconds to pick a word
+const REVEAL_TIME  = 6;            // seconds on the scoreboard between turns
+const PEER_TIMEOUT = 15000;        // drop a guest we have not heard from in this long
+const HEARTBEAT    = 3000;
+const SEND_EVERY   = 50;           // ms between stroke packets
+
+const PIPS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db',
+              '#9b59b6','#e84393','#8d6e63','#607d8b','#00b894','#ff7675'];
+
+const PALETTE = ['#ffffff','#c1c1c1','#ef130b','#ff7100','#ffe400','#00cc00','#00b2ff','#231fd3','#a300ba','#d37caa','#a0522d',
+                 '#000000','#4c4c4c','#740b07','#c23800','#e8a200','#005510','#00569e','#0e0865','#550069','#a75574','#63300d'];
+const SIZES = [4, 10, 20, 38];
+
+const WORDS = ('airplane,alarm clock,alien,anchor,angel,ant,apple,arrow,astronaut,avocado,axe,baby,backpack,bacon,badge,bagel,' +
+ 'balloon,banana,bandage,barbecue,barn,baseball,basket,bat,bathtub,battery,beach,beard,beaver,bed,bee,beehive,beetle,bell,belt,' +
+ 'bench,bicycle,binoculars,bird,birthday cake,blender,blanket,blood,boat,bone,bonfire,bookshelf,boomerang,boots,bottle,bow tie,' +
+ 'bowling,box,bracelet,brain,bread,brick,bridge,broccoli,broom,bubble,bucket,bulldozer,bunk bed,burger,bus,butter,butterfly,' +
+ 'cactus,cage,calculator,calendar,camel,camera,campfire,candle,candy,cannon,canoe,cap,car,carrot,castle,cat,caterpillar,' +
+ 'cauldron,cave,ceiling fan,cello,chain,chair,chalk,cheese,chef,cherry,chess,chicken,chimney,chocolate,church,circus,clock,' +
+ 'closet,cloud,clown,coat,cobweb,coconut,coffee,coin,comb,comet,compass,computer,cone,cookie,coral,corn,couch,cow,cowboy,crab,' +
+ 'crane,crayon,cricket,crocodile,crown,crutch,cube,cucumber,cup,cupcake,curtain,dam,dandelion,dart,deer,desert,desk,diamond,' +
+ 'dice,dinosaur,dishwasher,doctor,dog,doghouse,doll,dolphin,domino,donkey,donut,door,dragon,drawer,dream,dress,drill,drum,duck,' +
+ 'dumbbell,eagle,ear,earmuffs,earth,easel,egg,elbow,electricity,elephant,elevator,elf,envelope,eraser,escalator,eyebrow,' +
+ 'factory,fairy,fan,farm,feather,fence,ferry,field,fire,fire truck,fireplace,firework,fish,fishbowl,fishing rod,flag,' +
+ 'flamingo,flashlight,flood,flower,flute,fly,fog,football,forest,fork,fountain,fox,frame,freckles,fridge,frog,frost,fruit,' +
+ 'galaxy,garage,garden,garlic,gate,ghost,giraffe,glacier,glasses,globe,glove,glue,goat,goggles,gold,golf,goose,gorilla,grapes,' +
+ 'grass,grasshopper,greenhouse,guitar,gum,gymnast,hail,hair,hammer,hammock,hamster,hand,handbag,handcuffs,harbour,harp,hat,' +
+ 'hay,headphones,heart,hedgehog,helicopter,helmet,highway,hill,hive,hockey,honey,hook,horse,hospital,hot air balloon,hotdog,' +
+ 'hourglass,house,hurricane,ice cream,iceberg,igloo,ink,insect,island,jacket,jaguar,jam,jar,jeans,jellyfish,jet,jigsaw,juggler,' +
+ 'juice,kangaroo,kayak,kettle,key,keyboard,kite,kitten,knee,knife,knight,knot,koala,ladder,ladybug,lamp,lantern,laptop,lasso,' +
+ 'lava,lawn mower,leaf,leash,lemon,lemonade,leopard,letter,lettuce,library,light bulb,lighthouse,lightning,lime,lion,lipstick,' +
+ 'lizard,llama,lobster,lock,log,lollipop,luggage,lungs,magnet,magpie,mailbox,mammoth,map,maple syrup,marble,mask,mattress,maze,' +
+ 'meatball,medal,melon,mermaid,microphone,microscope,milk,mirror,mitten,moat,mole,money,monkey,monster,moon,moose,mop,mosquito,' +
+ 'moth,motorbike,mountain,mouse,moustache,mouth,mud,muffin,mug,mushroom,music,nail,napkin,necklace,needle,nest,net,newspaper,' +
+ 'night,ninja,noodles,nose,notebook,nurse,nut,oar,ocean,octopus,office,oil,olive,omelette,onion,orange,orbit,ostrich,otter,oven,' +
+ 'owl,oxygen,pacifier,paddle,paint,palm tree,pancake,panda,pants,paperclip,parachute,parade,parrot,party,passport,pasta,path,' +
+ 'paw,peach,peacock,peanut,pear,pearl,pen,pencil,penguin,pepper,perfume,phone,piano,pickle,picnic,pie,pig,pigeon,pillow,pilot,' +
+ 'pineapple,pipe,pirate,pizza,planet,plant,plate,platypus,plug,plum,plumber,pocket,polar bear,pond,popcorn,porcupine,postcard,' +
+ 'potato,pot,present,pretzel,prince,pumpkin,puppet,puppy,purse,puzzle,pyramid,queen,quilt,rabbit,raccoon,race,radio,raft,' +
+ 'railway,rain,rainbow,raincoat,rake,ramp,rat,rattle,razor,recipe,reef,remote,rhino,ribbon,rice,ring,river,road,robin,robot,' +
+ 'rocket,rocking chair,roof,rooster,root,rope,rose,rowboat,rug,ruler,sailboat,salad,salt,sand,sandcastle,sandwich,satellite,' +
+ 'sausage,saw,scarecrow,scarf,school,scissors,scooter,scorpion,screw,seagull,seahorse,seal,seashell,seatbelt,seed,seesaw,shadow,' +
+ 'shampoo,shark,sheep,shelf,ship,shipwreck,shirt,shoe,shovel,shower,sink,skateboard,skeleton,ski,skirt,skull,skunk,sky,' +
+ 'skyscraper,sled,sleeping bag,slide,slippers,sloth,smoke,snail,snake,sneeze,snow,snowflake,snowman,soap,soccer,sock,sofa,' +
+ 'soup,spaceship,spade,spaghetti,sparkler,speaker,spider,spinach,sponge,spoon,spring,sprinkler,squid,squirrel,stadium,stairs,' +
+ 'stamp,stapler,star,starfish,statue,steam,stethoscope,stingray,stomach,stone,stopwatch,stork,storm,stove,strawberry,street,' +
+ 'submarine,sugar,suitcase,summer,sun,sunflower,sunglasses,sunrise,surfboard,swamp,swan,sweater,swimming pool,swing,sword,' +
+ 'table,tadpole,tail,tambourine,tank,tape,tea,teapot,teddy bear,telescope,television,tennis,tent,thermometer,thief,thorn,' +
+ 'thumb,thunder,ticket,tiger,tightrope,tire,toast,toaster,toilet,tomato,tongue,toolbox,tooth,toothbrush,toothpaste,tornado,' +
+ 'tortoise,tower,toy,tractor,traffic light,train,trampoline,treasure,tree,triangle,trophy,trumpet,tulip,tunnel,turkey,turtle,' +
+ 'tuxedo,twig,typewriter,umbrella,unicorn,vacuum,valley,vampire,van,vase,vegetable,vending machine,vest,vet,village,vine,' +
+ 'violin,volcano,volleyball,vulture,waffle,wagon,waiter,wallet,walnut,walrus,wand,warehouse,washing machine,wasp,watch,' +
+ 'waterfall,watermelon,wave,weasel,web,wedding,whale,wheat,wheel,wheelbarrow,whisk,whistle,wig,wind,windmill,window,wing,' +
+ 'winter,wire,witch,wizard,wolf,wood,woodpecker,wool,worm,wrench,wrist,yacht,yard,yarn,yawn,yeti,yoga,yolk,yo-yo,zebra,' +
+ 'zigzag,zipper,zombie,zoo').split(',');
+
+/* ---------------- state shared by every client ---------------- */
+let G = {
+  phase:'menu',                 // menu | lobby | choose | draw | reveal | over
+  players:[],                   // [{id, name, color, score, guessed, gain}]
+  round:0, drawerId:-1,
+  pattern:'', time:0, total:0,
+  settings:{ rounds:3, drawTime:80, hints:2, custom:'', onlyCustom:false }
+};
+let me      = { id:-1, name:'', color:0 };
+let mode    = 'off';            // off | host | guest
+let peer = null, conn = null, guests = [], roomCode = '';
+const banned = new Set();
+let myWord = '';                // the real word, only ever sent to the drawer
+let ops = [];                   // every drawing op on the current board, in host order
+
+/* host-only bookkeeping */
+const H = { order:[], turnIdx:0, word:'', choices:[], deadline:0, lastSec:-1,
+            revealed:new Set(), hintAt:[], gains:{}, guessOrder:[], used:new Set(), pool:[] };
+
+/* ---------------- DOM ---------------- */
+const $ = id => document.getElementById(id);
+const pad = $('pad'), ctx = pad.getContext('2d', { willReadFrequently:true });
+const log = $('log'), cards = $('cards');
+const CARDS = ['cardMenu','cardLobby','cardChoose','cardReveal','cardOver'];
+
+const clean = (raw, fallback) => (String(raw == null ? '' : raw).replace(/[^\w '\-]/g, '').trim().slice(0, 14) || fallback);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const now = () => performance.now();
+const byId = id => G.players.find(p => p.id === id);
+const isDrawer = () => G.drawerId === me.id;
+
+/* letters only, so "The Moon!" matches "the moon" */
+const normalize = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function editDistance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let last = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, last + (a[i - 1] === b[j - 1] ? 0 : 1));
+      last = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+/* ---------------- chat log ---------------- */
+function say(text, kind, who, colour) {
+  const li = document.createElement('li');
+  if (kind) li.className = kind;
+  if (who) {
+    const b = document.createElement('b');
+    b.textContent = who + ': ';
+    if (colour) b.style.color = colour;
+    li.appendChild(b);
+  }
+  li.appendChild(document.createTextNode(text));
+  log.appendChild(li);
+  while (log.children.length > 200) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ---------------- screens ---------------- */
+function showCard(id) {
+  for (const c of CARDS) $(c).classList.toggle('on', c === id);
+  cards.classList.toggle('dim', !!id);
+  cards.style.pointerEvents = id ? '' : 'none';
+}
+
+/* Letters spaced out for legibility, but a two-word answer still wraps as two
+   words rather than splitting in the middle on a narrow phone. */
+function spaced(text) {
+  return String(text).split(/\s+/).filter(Boolean).map(w => w.split('').join('\u00A0')).join('   ');
+}
+function renderHud() {
+  const drawer = byId(G.drawerId);
+  if (G.phase === 'menu' || G.phase === 'lobby') {
+    $('hRound').innerHTML = 'Room<b>' + (roomCode || '—') + '</b>';
+    $('wordMask').textContent = 'S C R I B B L E';
+    $('wordNote').textContent = mode === 'off' ? 'Draw and guess with up to 12 players'
+                                               : G.players.length + ' of ' + MAX_PLAYERS + ' players in the room';
+    $('clock').textContent = '—';
+    $('barFill').style.width = '100%';
+  } else {
+    $('hRound').innerHTML = 'Round<b>' + G.round + ' / ' + G.settings.rounds + '</b>';
+    $('wordMask').textContent = spaced(isDrawer() && myWord && G.phase === 'draw' ? myWord.toUpperCase() : G.pattern);
+    $('wordNote').textContent = G.phase === 'choose'
+      ? (isDrawer() ? 'Pick a word to draw' : (drawer ? drawer.name + ' is choosing a word' : ''))
+      : G.phase === 'draw'
+        ? (isDrawer() ? 'You are drawing — no typing the word!' : (drawer ? drawer.name + ' is drawing' : ''))
+        : G.phase === 'reveal' ? 'Turn over' : 'Game over';
+    const t = Math.max(0, Math.ceil(G.time));
+    $('clock').textContent = t;
+    $('clock').classList.toggle('low', G.phase === 'draw' && t <= 10);
+    const pct = G.total ? clamp(G.time / G.total, 0, 1) * 100 : 100;
+    $('barFill').style.width = pct + '%';
+    $('barFill').classList.toggle('low', G.phase === 'draw' && t <= 10);
+  }
+}
+
+function renderPlayers() {
+  const host = $('players');
+  host.textContent = '';
+  const ranked = G.players.slice().sort((a, b) => b.score - a.score || a.id - b.id);
+  ranked.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'pl' + (p.id === me.id ? ' me' : '') +
+                    (p.guessed ? ' guessed' : '') + (p.id === G.drawerId ? ' drawing' : '');
+
+    const pip = document.createElement('span');
+    pip.className = 'pip';
+    pip.style.background = PIPS[p.color % PIPS.length];
+    pip.textContent = (p.name[0] || '?').toUpperCase();
+    row.appendChild(pip);
+
+    const who = document.createElement('span');
+    who.className = 'who';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = p.name + (p.id === me.id ? ' (you)' : '');
+    const sc = document.createElement('span');
+    sc.className = 'sc';
+    sc.textContent = '#' + (i + 1) + ' · ' + p.score + ' points' + (p.gain ? '  (+' + p.gain + ')' : '');
+    who.appendChild(nm); who.appendChild(sc);
+    row.appendChild(who);
+
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = p.id === G.drawerId ? '✏️' : p.guessed ? '✅' : p.id === 0 ? '👑' : '';
+    row.appendChild(tag);
+
+    if (mode === 'host' && p.id !== me.id) {
+      const k = document.createElement('button');
+      k.className = 'kick';
+      k.type = 'button';
+      k.title = 'Remove ' + p.name;
+      k.setAttribute('aria-label', 'Remove ' + p.name);
+      k.textContent = '✕';
+      k.onclick = () => kick(p.id);
+      row.appendChild(k);
+    }
+    host.appendChild(row);
+  });
+}
+
+function renderLobby() {
+  $('lobbyCode').textContent = roomCode;
+  const s = G.settings;
+  $('sRounds').value = s.rounds;
+  $('sTime').value = s.drawTime;
+  $('sHints').value = s.hints;
+  $('sOnly').checked = !!s.onlyCustom;
+  if (document.activeElement !== $('custom')) $('custom').value = s.custom || '';
+  const isHost = mode === 'host';
+  for (const id of ['sRounds','sTime','sHints','sOnly','custom']) $(id).disabled = !isHost;
+  $('bStart').style.display = isHost ? '' : 'none';
+  $('roster').textContent = G.players.length + ' of ' + MAX_PLAYERS + ' players: ' +
+                            G.players.map(p => p.name).join(', ');
+  $('lobbyNote').textContent = isHost
+    ? (G.players.length < 2 ? 'Better with friends — you can start alone to practise.' : '')
+    : 'Waiting for the host to start the game.';
+}
+
+function renderTools() {
+  const on = G.phase === 'draw' && isDrawer();
+  $('tools').classList.toggle('on', on);
+  pad.classList.toggle('draw', on);
+  $('say').placeholder = on ? 'You are drawing — chat is off for you' : 'Type your guess here';
+  $('say').disabled = on;
+}
+
+function render() { renderHud(); renderPlayers(); renderTools(); }
+</script>
+
+<script>
+/* =======================================================================
+   The board.  Every stroke is an op in a list the host orders, so a player
+   who joins halfway through can be handed the list and end up with exactly
+   the same picture — including flood fills, which replay pixel for pixel
+   because the board is always 900x600 internally.
+   ======================================================================= */
+
+let tool = 'brush', ink = '#000000', nib = SIZES[1];
+let stroke = null, sentPts = 0, lastSend = 0, opSeq = 0;
+
+function blankBoard() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, CW, CH);
+}
+function strokePath(colour, width, pts) {
+  if (pts.length < 2) return;
+  ctx.strokeStyle = colour;
+  ctx.fillStyle = colour;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (pts.length === 2) {                       // a single tap is a dot
+    ctx.beginPath();
+    ctx.arc(pts[0], pts[1], width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.stroke();
+}
+
+function floodFill(x, y, hex) {
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || y < 0 || x >= CW || y >= CH) return;
+  const img = ctx.getImageData(0, 0, CW, CH);
+  const d = img.data;
+  const at = (px, py) => (py * CW + px) * 4;
+  const start = at(x, y);
+  const t0 = d[start], t1 = d[start + 1], t2 = d[start + 2], t3 = d[start + 3];
+  const n = parseInt(hex.slice(1), 16);
+  const f0 = (n >> 16) & 255, f1 = (n >> 8) & 255, f2 = n & 255;
+  if (t0 === f0 && t1 === f1 && t2 === f2 && t3 === 255) return;
+  const same = i => d[i] === t0 && d[i + 1] === t1 && d[i + 2] === t2 && d[i + 3] === t3;
+  const stack = [x, y];
+  while (stack.length) {
+    const py = stack.pop(), px = stack.pop();
+    let west = px, east = px;
+    while (west > 0 && same(at(west - 1, py))) west--;
+    while (east < CW - 1 && same(at(east + 1, py))) east++;
+    for (let i = west; i <= east; i++) {
+      const p = at(i, py);
+      d[p] = f0; d[p + 1] = f1; d[p + 2] = f2; d[p + 3] = 255;
+      if (py > 0 && same(at(i, py - 1))) stack.push(i, py - 1);
+      if (py < CH - 1 && same(at(i, py + 1))) stack.push(i, py + 1);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* A stroke keeps the packets it arrived in rather than one merged point list.
+   Replaying those same packets in the same order is what keeps a late joiner's
+   board pixel-identical to everybody else's — down to the antialiasing, which
+   matters because a flood fill leaks through a one-pixel gap. */
+function paintOp(op) {
+  if (op.f) floodFill(op.x, op.y, op.c);
+  else for (const seg of op.segs) strokePath(op.c, op.w, seg);
+}
+function redrawAll() {
+  blankBoard();
+  for (const op of ops) paintOp(op);
+}
+
+/* apply one op packet — from the host, or from ourselves once the host echoes it */
+function applyDraw(d) {
+  if (d.f) {
+    ops.push({ id:d.id, f:1, c:d.c, x:d.x, y:d.y });
+    floodFill(d.x, d.y, d.c);
+    return;
+  }
+  const chunk = (d.p || []).slice();
+  let op = null;
+  for (let i = ops.length - 1; i >= 0; i--) if (ops[i].id === d.id) { op = ops[i]; break; }
+  if (!op) {
+    op = { id:d.id, c:d.c, w:d.w, segs:[] };
+    ops.push(op);
+  }
+  op.segs.push(chunk);                       // packets repeat their last point, so segments join up
+  strokePath(op.c, op.w, chunk);
+  if (ops.length > 4000) ops.splice(0, ops.length - 4000);
+}
+
+function clearBoard() { ops = []; blankBoard(); }
+
+/* ---------------- pointer input (drawer only) ---------------- */
+function boardPos(e) {
+  const r = pad.getBoundingClientRect();
+  return {
+    x: clamp((e.clientX - r.left) / r.width * CW, 0, CW - 1),
+    y: clamp((e.clientY - r.top) / r.height * CH, 0, CH - 1)
+  };
+}
+const canDraw = () => G.phase === 'draw' && isDrawer();
+
+function flushStroke(force) {
+  if (!stroke) return;
+  const t = now();
+  if (!force && t - lastSend < SEND_EVERY) return;
+  if (stroke.p.length <= sentPts) return;
+  const from = Math.max(0, sentPts - 2);                 // repeat the last sent point to bridge the gap
+  toHost({ t:'draw', id:stroke.id, c:stroke.c, w:stroke.w, p:stroke.p.slice(from) });
+  sentPts = stroke.p.length;
+  lastSend = t;
+}
+
+pad.addEventListener('pointerdown', e => {
+  if (!canDraw()) return;
+  const { x, y } = boardPos(e);
+  pad.setPointerCapture(e.pointerId);
+  if (tool === 'fill') {
+    toHost({ t:'draw', id:me.id + '-' + (++opSeq), f:1, c:ink, x:Math.round(x), y:Math.round(y) });
+    return;
+  }
+  const colour = tool === 'erase' ? '#ffffff' : ink;
+  stroke = { id:me.id + '-' + (++opSeq), c:colour, w:nib, p:[x, y] };
+  sentPts = 0; lastSend = 0;
+  flushStroke(true);
+});
+pad.addEventListener('pointermove', e => {
+  if (!stroke || !canDraw()) return;
+  const { x, y } = boardPos(e);
+  const n = stroke.p.length;
+  if (n >= 2 && Math.abs(x - stroke.p[n - 2]) < 1 && Math.abs(y - stroke.p[n - 1]) < 1) return;
+  stroke.p.push(x, y);
+  flushStroke(false);
+});
+function endStroke() { flushStroke(true); stroke = null; }
+pad.addEventListener('pointerup', endStroke);
+pad.addEventListener('pointercancel', endStroke);
+pad.addEventListener('pointerleave', endStroke);
+window.addEventListener('blur', endStroke);
+
+/* ---------------- tool bar ---------------- */
+function paintTools() {
+  for (const b of $('palette').children) b.classList.toggle('on', b.dataset.c === ink && tool !== 'erase');
+  for (const b of $('sizes').children) b.classList.toggle('on', +b.dataset.s === nib);
+  $('tBrush').classList.toggle('on', tool === 'brush');
+  $('tFill').classList.toggle('on', tool === 'fill');
+  $('tErase').classList.toggle('on', tool === 'erase');
+  $('inkPeek').style.background = tool === 'erase' ? '#ffffff' : ink;
+}
+function buildTools() {
+  const pal = $('palette');
+  for (const c of PALETTE) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.background = c;
+    b.dataset.c = c;
+    b.title = c;
+    b.setAttribute('aria-label', 'Colour ' + c);
+    b.onclick = () => { ink = c; if (tool === 'erase') tool = 'brush'; paintTools(); };
+    pal.appendChild(b);
+  }
+  const sz = $('sizes');
+  for (const s of SIZES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.s = s;
+    b.title = s + 'px brush';
+    b.setAttribute('aria-label', s + ' pixel brush');
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    const px = Math.max(5, Math.round(s * 0.55));
+    dot.style.width = px + 'px';
+    dot.style.height = px + 'px';
+    b.appendChild(dot);
+    b.onclick = () => { nib = s; paintTools(); };
+    sz.appendChild(b);
+  }
+  $('tBrush').onclick = () => { tool = 'brush'; paintTools(); };
+  $('tFill').onclick  = () => { tool = 'fill';  paintTools(); };
+  $('tErase').onclick = () => { tool = 'erase'; paintTools(); };
+  $('tUndo').onclick  = () => { if (canDraw()) toHost({ t:'undo' }); };
+  $('tClear').onclick = () => { if (canDraw()) toHost({ t:'wipe' }); };
+  paintTools();
+}
+
+document.addEventListener('keydown', e => {
+  if (!canDraw() || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); toHost({ t:'undo' }); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'b') { tool = 'brush'; paintTools(); }
+  else if (k === 'f') { tool = 'fill'; paintTools(); }
+  else if (k === 'e') { tool = 'erase'; paintTools(); }
+  else if (k >= '1' && k <= '4') { nib = SIZES[+k - 1]; paintTools(); }
+});
+</script>
+
+<script>
+/* =======================================================================
+   Wire format.  Guests send intent to the host; the host broadcasts truth.
+   The host handles its own intent locally so there is only one code path.
+   ======================================================================= */
+const sendTo = (c, o) => { if (c && c.open) { try { c.send(o); } catch (e) {} } };
+function broadcast(o) {
+  for (const g of guests) sendTo(g.conn, o);
+  onMessage(o);
+}
+function sendToId(id, o) {
+  if (id === me.id) { onMessage(o); return; }
+  const g = guests.find(x => x.id === id);
+  sendTo(g && g.conn, o);
+}
+function toHost(o) {
+  if (mode === 'host') onHostMsg(me.id, o);
+  else sendTo(conn, o);
+}
+const slim = () => G.players.map(p => ({ id:p.id, name:p.name, color:p.color, score:p.score,
+                                         guessed:!!p.guessed, gain:p.gain || 0 }));
+
+/* =======================================================================
+   Host: the rules of the game.
+   ======================================================================= */
+function buildPool() {
+  const extra = String(G.settings.custom || '')
+    .split(/[,\n]/).map(w => w.trim().replace(/\s+/g, ' ')).filter(w => w.length > 1 && w.length < 32);
+  H.pool = G.settings.onlyCustom && extra.length >= 3 ? extra : WORDS.concat(extra);
+  H.used.clear();
+}
+function pickWords(n) {
+  const out = [];
+  let guard = 0;
+  while (out.length < n && guard++ < 600) {
+    const w = H.pool[Math.random() * H.pool.length | 0];
+    if (!w || out.includes(w) || H.used.has(w)) continue;
+    out.push(w);
+  }
+  if (!out.length) { H.used.clear(); out.push(H.pool[0] || 'scribble'); }
+  return out;
+}
+function patternOf(word, revealed) {
+  return word.split('').map((ch, i) => (/[a-z0-9]/i.test(ch) ? (revealed.has(i) ? ch : '_') : ch)).join('');
+}
+
+function hostStartGame() {
+  if (mode !== 'host') return;
+  readSettings();
+  buildPool();
+  for (const p of G.players) { p.score = 0; p.gain = 0; p.guessed = false; }
+  G.round = 0;
+  broadcast({ t:'chat', kind:'sys', text:'The game begins! ' + G.settings.rounds + ' rounds, ' +
+                                        G.settings.drawTime + ' seconds a turn.' });
+  hostNextRound();
+}
+function hostNextRound() {
+  G.round++;
+  if (G.round > G.settings.rounds) return hostEndGame();
+  H.order = G.players.map(p => p.id);
+  H.turnIdx = -1;
+  broadcast({ t:'chat', kind:'sys', text:'— Round ' + G.round + ' of ' + G.settings.rounds + ' —' });
+  hostNextTurn();
+}
+function hostNextTurn() {
+  H.turnIdx++;
+  while (H.turnIdx < H.order.length && !byId(H.order[H.turnIdx])) H.turnIdx++;
+  if (H.turnIdx >= H.order.length) return hostNextRound();
+  const drawer = byId(H.order[H.turnIdx]);
+  if (!drawer) return hostNextTurn();
+
+  for (const p of G.players) { p.guessed = false; p.gain = 0; }
+  H.gains = {}; H.guessOrder = []; H.revealed = new Set(); H.word = '';
+  H.choices = pickWords(3);
+  G.phase = 'choose'; G.drawerId = drawer.id; G.pattern = ''; G.total = CHOOSE_TIME;
+  H.deadline = now() + CHOOSE_TIME * 1000;
+  H.lastSec = -1;
+
+  broadcast({ t:'turn', round:G.round, drawerId:drawer.id, players:slim(), time:CHOOSE_TIME });
+  sendToId(drawer.id, { t:'choices', words:H.choices });
+}
+function hostBeginDraw(word) {
+  const drawer = byId(G.drawerId);
+  if (!drawer) return hostNextTurn();
+  H.word = word;
+  H.revealed = new Set();
+  const spots = word.split('').map((ch, i) => i).filter(i => /[a-z0-9]/i.test(word[i]));
+  const hints = Math.min(G.settings.hints, Math.max(0, Math.floor(spots.length / 2)));
+  H.hintAt = [];
+  for (let i = 1; i <= hints; i++) H.hintAt.push(G.settings.drawTime * (1 - i / (hints + 1)));
+
+  G.phase = 'draw';
+  G.total = G.settings.drawTime;
+  G.time = G.settings.drawTime;
+  G.pattern = patternOf(word, H.revealed);
+  H.deadline = now() + G.settings.drawTime * 1000;
+  H.lastSec = -1;
+
+  broadcast({ t:'begin', pattern:G.pattern, time:G.settings.drawTime, players:slim() });
+  sendToId(drawer.id, { t:'word', word });
+  broadcast({ t:'chat', kind:'sys', text:drawer.name + ' is drawing now!' });
+}
+function hostHint() {
+  const spots = H.word.split('').map((ch, i) => i)
+                  .filter(i => /[a-z0-9]/i.test(H.word[i]) && !H.revealed.has(i));
+  if (!spots.length) return;
+  H.revealed.add(spots[Math.random() * spots.length | 0]);
+  G.pattern = patternOf(H.word, H.revealed);
+  broadcast({ t:'hint', pattern:G.pattern });
+}
+function hostScoreGuess(p) {
+  const left = Math.max(0, (H.deadline - now()) / 1000);
+  const pts = 50 + Math.round(300 * clamp(left / G.settings.drawTime, 0, 1));
+  p.guessed = true;
+  p.score += pts;
+  p.gain = (p.gain || 0) + pts;
+  H.gains[p.id] = pts;
+  H.guessOrder.push(p.id);
+  broadcast({ t:'got', id:p.id, name:p.name, place:H.guessOrder.length, players:slim() });
+
+  const waiting = G.players.filter(q => q.id !== G.drawerId && !q.guessed).length;
+  if (!waiting) hostEndTurn('everybody guessed it');
+  else if (H.deadline - now() > 20000) {
+    H.deadline = now() + Math.min(H.deadline - now(), 20000);   // hurry the stragglers along
+    broadcast({ t:'chat', kind:'sys', text:'20 seconds left to guess!' });
+  }
+}
+function hostEndTurn(why) {
+  if (G.phase !== 'draw' && G.phase !== 'choose') return;
+  const drawer = byId(G.drawerId);
+  const word = H.word || (H.choices[0] || '');
+  if (drawer && H.guessOrder.length) {
+    const possible = Math.max(1, G.players.filter(p => p.id !== drawer.id).length);
+    const sum = H.guessOrder.reduce((a, id) => a + (H.gains[id] || 0), 0);
+    const bonus = Math.round(sum / H.guessOrder.length * (H.guessOrder.length / possible));
+    drawer.score += bonus;
+    drawer.gain = (drawer.gain || 0) + bonus;
+    H.gains[drawer.id] = bonus;
+  }
+  G.phase = 'reveal';
+  G.total = REVEAL_TIME;
+  G.time = REVEAL_TIME;
+  H.deadline = now() + REVEAL_TIME * 1000;
+  H.lastSec = -1;
+  broadcast({ t:'reveal', word, why:why || '', players:slim(), time:REVEAL_TIME });
+}
+function hostEndGame() {
+  G.phase = 'over';
+  G.drawerId = -1;
+  H.deadline = 0;
+  broadcast({ t:'over', players:slim() });
+}
+function hostBackToLobby() {
+  G.phase = 'lobby';
+  G.round = 0;
+  G.drawerId = -1;
+  G.pattern = '';
+  for (const p of G.players) { p.guessed = false; p.gain = 0; }
+  H.deadline = 0;
+  broadcast({ t:'lobby', players:slim(), settings:G.settings, code:roomCode });
+  broadcast({ t:'wipe' });
+}
+
+function hostTick() {
+  if (mode !== 'host') return;
+  dropDeadGuests();
+  if (!H.deadline) return;
+  const left = (H.deadline - now()) / 1000;
+
+  if (G.phase === 'choose') {
+    const sec = Math.max(0, Math.ceil(left));
+    if (sec !== H.lastSec) { H.lastSec = sec; broadcast({ t:'time', v:sec }); }
+    if (left <= 0) hostBeginDraw(H.choices[Math.random() * H.choices.length | 0]);
+    return;
+  }
+  if (G.phase === 'draw') {
+    const sec = Math.max(0, Math.ceil(left));
+    if (sec !== H.lastSec) { H.lastSec = sec; broadcast({ t:'time', v:sec }); }
+    while (H.hintAt.length && left <= H.hintAt[0]) { H.hintAt.shift(); hostHint(); }
+    if (left <= 0) hostEndTurn('time ran out');
+    return;
+  }
+  if (G.phase === 'reveal') {
+    const sec = Math.max(0, Math.ceil(left));
+    if (sec !== H.lastSec) { H.lastSec = sec; broadcast({ t:'time', v:sec }); }
+    if (left <= 0) hostNextTurn();
+  }
+}
+setInterval(hostTick, 200);
+
+/* ---------------- host: incoming intent ---------------- */
+function onHostMsg(id, d) {
+  if (mode !== 'host' || !d || typeof d !== 'object') return;
+  const p = byId(id);
+  if (!p) return;
+
+  if (d.t === 'ping') { sendToId(id, { t:'pong' }); return; }
+
+  if (d.t === 'chat') {
+    const text = String(d.text || '').slice(0, 120).trim();
+    if (!text) return;
+    if (G.phase === 'draw') {
+      if (id === G.drawerId || p.guessed) {            // keep the answer out of the open channel
+        for (const q of G.players) {
+          if (q.id === G.drawerId || q.guessed) sendToId(q.id, { t:'chat', kind:'locked', who:p.name, colour:PIPS[p.color % PIPS.length], text });
+        }
+        return;
+      }
+      const guess = normalize(text), answer = normalize(H.word);
+      if (answer && guess === answer) { hostScoreGuess(p); return; }
+      if (answer && guess.length > 2 && editDistance(guess, answer) <= (answer.length > 7 ? 2 : 1)) {
+        sendToId(id, { t:'chat', kind:'close', text:'"' + text + '" is very close!' });
+        return;
+      }
+    }
+    broadcast({ t:'chat', who:p.name, colour:PIPS[p.color % PIPS.length], text });
+    return;
+  }
+
+  if (d.t === 'pick') {
+    if (G.phase !== 'choose' || id !== G.drawerId) return;
+    const w = H.choices[clamp(d.i | 0, 0, H.choices.length - 1)];
+    if (!w) return;
+    H.used.add(w);
+    hostBeginDraw(w);
+    return;
+  }
+
+  if (d.t === 'draw') {
+    if (G.phase !== 'draw' || id !== G.drawerId) return;
+    if (d.f) {
+      if (typeof d.x !== 'number' || typeof d.y !== 'number' || !/^#[0-9a-f]{6}$/i.test(d.c || '')) return;
+      broadcast({ t:'draw', id:String(d.id).slice(0, 24), f:1, c:d.c, x:clamp(d.x | 0, 0, CW - 1), y:clamp(d.y | 0, 0, CH - 1) });
+      return;
+    }
+    if (!Array.isArray(d.p) || d.p.length < 2 || d.p.length > 4000) return;
+    if (!/^#[0-9a-f]{6}$/i.test(d.c || '')) return;
+    const pts = d.p.map(v => Math.round(clamp(+v || 0, 0, Math.max(CW, CH)) * 10) / 10);
+    broadcast({ t:'draw', id:String(d.id).slice(0, 24), c:d.c, w:clamp(+d.w || 4, 1, 60), p:pts });
+    return;
+  }
+
+  if (d.t === 'undo') { if (G.phase === 'draw' && id === G.drawerId) broadcast({ t:'undo' }); return; }
+  if (d.t === 'wipe') { if (G.phase === 'draw' && id === G.drawerId) broadcast({ t:'wipe' }); return; }
+}
+
+/* ---------------- client: incoming truth ---------------- */
+function onMessage(d) {
+  if (!d || typeof d !== 'object') return;
+  switch (d.t) {
+    case 'welcome':
+      me.id = d.id; roomCode = d.code || roomCode;
+      break;
+    case 'lobby':
+      G.phase = 'lobby';
+      G.players = d.players || [];
+      if (d.settings) G.settings = d.settings;
+      if (d.code) roomCode = d.code;
+      G.drawerId = -1; myWord = '';
+      showCard('cardLobby'); renderLobby(); render();
+      break;
+    case 'sync':                                   // a full picture for somebody joining late
+      G.phase = d.phase; G.players = d.players || []; G.settings = d.settings || G.settings;
+      G.round = d.round || 0; G.drawerId = d.drawerId; G.pattern = d.pattern || '';
+      G.time = d.time || 0; G.total = d.total || 0;
+      if (d.code) roomCode = d.code;
+      clearBoard();
+      if (G.phase === 'lobby') { showCard('cardLobby'); renderLobby(); }
+      else if (G.phase === 'choose') showChoose(null);
+      else if (G.phase === 'over') showOver();
+      else showCard(null);
+      render();
+      break;
+    case 'roster':
+      G.players = d.players || G.players;
+      if (G.phase === 'lobby') renderLobby();
+      render();
+      break;
+    case 'turn':
+      G.phase = 'choose'; G.round = d.round; G.drawerId = d.drawerId;
+      G.players = d.players || G.players;
+      G.time = d.time; G.total = d.time; G.pattern = ''; myWord = '';
+      clearBoard();
+      showChoose(null);
+      render();
+      break;
+    case 'choices':
+      showChoose(d.words || []);
+      break;
+    case 'begin':
+      G.phase = 'draw'; G.pattern = d.pattern || ''; G.time = d.time; G.total = d.time;
+      G.players = d.players || G.players;
+      showCard(null);
+      render();
+      if (isDrawer()) $('say').blur();
+      else if (matchMedia('(hover: hover)').matches) $('say').focus({ preventScroll:true });
+      break;
+    case 'word':
+      myWord = d.word || '';
+      renderHud();
+      break;
+    case 'hint':
+      G.pattern = d.pattern || G.pattern;
+      renderHud();
+      break;
+    case 'time':
+      G.time = d.v;
+      renderHud();
+      break;
+    case 'got':
+      G.players = d.players || G.players;
+      say(d.name + ' guessed the word!' + (d.place === 1 ? ' (first!)' : ''), 'good');
+      render();
+      break;
+    case 'reveal': {
+      G.phase = 'reveal'; G.players = d.players || G.players;
+      G.time = d.time; G.total = d.time; G.pattern = d.word || '';
+      myWord = '';
+      showReveal(d.word || '', d.why || '');
+      render();
+      break;
+    }
+    case 'over':
+      G.phase = 'over'; G.players = d.players || G.players;
+      G.drawerId = -1;
+      showOver();
+      render();
+      break;
+    case 'chat':
+      if (d.kind === 'sys') say(d.text, 'sys');
+      else if (d.kind === 'close') say(d.text, 'close');
+      else if (d.kind === 'locked') say(d.text, 'locked', d.who, d.colour);
+      else say(d.text, null, d.who, d.colour);
+      break;
+    case 'ops':                                    // the rest of a board we joined halfway through
+      for (const op of d.batch || []) {
+        if (!op || (!op.f && !Array.isArray(op.segs))) continue;
+        ops.push(op);
+        paintOp(op);
+      }
+      break;
+    case 'draw': applyDraw(d); break;
+    case 'undo': ops.pop(); redrawAll(); break;
+    case 'wipe': clearBoard(); break;
+    case 'full':
+      leaveReason = 'That room is already full (' + MAX_PLAYERS + ' players).';
+      break;
+    case 'kicked': kickedOut(); break;
+    case 'pong': break;
+  }
+}
+</script>
+
+<script>
+/* =======================================================================
+   Rooms: creating one, joining one, and surviving players who vanish.
+   ======================================================================= */
+const note = t => { $('menuNote').textContent = t; };
+let leaveReason = '';
+
+function netReady() {
+  if (typeof Peer !== 'undefined') return true;
+  note('Online play could not load. Check your connection and refresh the page.');
+  return false;
+}
+function resetNet() {
+  const open = guests.map(g => g.conn).concat(conn ? [conn] : []);
+  const pr = peer;
+  guests = []; conn = null; peer = null;
+  mode = 'off'; roomCode = ''; me.id = -1; myWord = '';
+  G.phase = 'menu'; G.players = []; G.round = 0; G.drawerId = -1; G.pattern = ''; G.time = 0; G.total = 0;
+  H.deadline = 0; H.order = []; H.turnIdx = 0; H.word = ''; H.choices = []; H.gains = {}; H.guessOrder = [];
+  clearBoard();
+  for (const c of open) { try { c.close(); } catch (e) {} }
+  if (pr) { try { pr.destroy(); } catch (e) {} }
+}
+function leaveRoom(reason) {
+  resetNet();
+  showCard('cardMenu');
+  render();
+  note(reason || '');
+  if (reason) say(reason, 'sys');
+}
+function inviteLink() { return location.origin + location.pathname + '#' + roomCode; }
+
+/* ---------------- host side ---------------- */
+function hostRoom() {
+  if (!netReady()) return;
+  resetNet();
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const code = Array.from({ length:5 }, () => chars[Math.random() * chars.length | 0]).join('');
+  mode = 'host'; roomCode = code; me.id = 0;
+  G.phase = 'lobby';
+  G.players = [{ id:0, name:me.name, color:me.color, score:0, guessed:false, gain:0 }];
+  readSettings();
+  note('Creating a room...');
+  peer = new Peer(ROOM_PREFIX + code);
+  peer.on('open', () => {
+    note('');
+    showCard('cardLobby'); renderLobby(); render();
+    say('Room ' + code + ' is open — share the code or the invite link.', 'sys');
+  });
+  peer.on('connection', c => c.on('open', () => guestJoined(c)));
+  peer.on('error', e => note(e.type === 'unavailable-id'
+    ? 'That code is already taken — press Create a room again.'
+    : 'Could not create a room (' + e.type + '). Try another network.'));
+}
+function freeId() {
+  for (let i = 1; i < MAX_PLAYERS; i++) if (!byId(i)) return i;
+  return -1;
+}
+function hostSnapshot() {
+  return { t:'sync', phase:G.phase, round:G.round, drawerId:G.drawerId, pattern:G.pattern,
+           time:Math.max(0, Math.ceil(G.time)), total:G.total, players:slim(),
+           settings:G.settings, code:roomCode };
+}
+/* A busy board is far too big for one data-channel message, so hand it over in
+   batches — they arrive in order, so the late joiner ends up with our picture. */
+function sendBoard(c) {
+  let batch = [], weight = 0;
+  for (const op of ops) {
+    batch.push(op);
+    weight += op.f ? 4 : op.segs.reduce((n, seg) => n + seg.length, 0);
+    if (weight >= 1500) { sendTo(c, { t:'ops', batch }); batch = []; weight = 0; }
+  }
+  if (batch.length) sendTo(c, { t:'ops', batch });
+}
+function guestJoined(c) {
+  if (mode !== 'host') { try { c.close(); } catch (e) {} return; }
+  if (banned.has(c.peer)) {
+    sendTo(c, { t:'kicked' });
+    setTimeout(() => { try { c.close(); } catch (e) {} }, 400);
+    return;
+  }
+  const id = freeId();
+  if (id < 0) {
+    sendTo(c, { t:'full' });
+    setTimeout(() => { try { c.close(); } catch (e) {} }, 800);
+    return;
+  }
+  const meta = c.metadata || {};
+  const name = clean(meta.name, 'Player ' + (id + 1));
+  const colour = clamp(meta.color | 0, 0, PIPS.length - 1);
+  const g = { conn:c, id, seen:now() };
+  guests.push(g);
+  G.players.push({ id, name, color:colour, score:0, guessed:false, gain:0 });
+
+  c.on('data', d => { g.seen = now(); onHostMsg(id, d); });
+  c.on('close', () => playerLeft(g, 'left the room'));
+  c.on('error', () => playerLeft(g, 'lost connection'));
+
+  sendTo(c, { t:'welcome', id, code:roomCode });
+  sendTo(c, hostSnapshot());
+  sendBoard(c);
+  broadcast({ t:'chat', kind:'sys', text:name + ' joined the room.' });
+  if (G.phase === 'lobby') broadcast({ t:'lobby', players:slim(), settings:G.settings, code:roomCode });
+  else broadcast({ t:'roster', players:slim() });
+}
+function playerLeft(g, why) {
+  if (mode !== 'host') return;
+  const i = guests.indexOf(g);
+  if (i < 0) return;
+  guests.splice(i, 1);
+  const p = byId(g.id);
+  G.players = G.players.filter(x => x.id !== g.id);
+  if (p) broadcast({ t:'chat', kind:'sys', text:p.name + ' ' + (why || 'left the room') + '.' });
+
+  if (G.phase === 'lobby') { broadcast({ t:'lobby', players:slim(), settings:G.settings, code:roomCode }); return; }
+  broadcast({ t:'roster', players:slim() });
+  if (G.phase === 'choose' || G.phase === 'draw') {
+    if (g.id === G.drawerId) hostEndTurn('the drawer left');
+    else if (G.phase === 'draw' && !G.players.some(q => q.id !== G.drawerId && !q.guessed)) hostEndTurn('everybody guessed it');
+  }
+}
+function kick(id) {
+  if (mode !== 'host') return;
+  const g = guests.find(x => x.id === id);
+  if (!g) return;
+  if (g.conn && g.conn.peer) banned.add(g.conn.peer);
+  sendTo(g.conn, { t:'kicked' });
+  const c = g.conn;
+  setTimeout(() => { try { c.close(); } catch (e) {} }, 400);
+  playerLeft(g, 'was removed by the host');
+}
+/* A browser that is closed or put to sleep often never fires 'close'. */
+function dropDeadGuests() {
+  if (mode !== 'host' || !guests.length) return;
+  const t = now();
+  for (const g of guests.slice()) {
+    const gone = (g.conn && g.conn.open === false) || t - (g.seen || t) > PEER_TIMEOUT;
+    if (!gone) continue;
+    try { g.conn.close(); } catch (e) {}
+    playerLeft(g, 'lost connection');
+  }
+}
+
+/* ---------------- guest side ---------------- */
+function joinRoom() {
+  if (!netReady()) return;
+  const code = $('fCode').value.trim().toUpperCase();
+  if (code.length < 5) { note('Type the 5-character room code first.'); return; }
+  resetNet();
+  mode = 'guest'; roomCode = code;
+  note('Connecting to ' + code + '...');
+  peer = new Peer();
+  peer.on('open', () => {
+    const c = peer.connect(ROOM_PREFIX + code, {
+      reliable:true, serialization:'json',
+      metadata:{ name:me.name, color:me.color }
+    });
+    c.on('open', () => {
+      conn = c;
+      note('');
+      say('Connected to room ' + code + '.', 'sys');
+      c.on('data', onMessage);
+      c.on('close', hostGone);
+      c.on('error', hostGone);
+    });
+    setTimeout(() => {
+      if (mode === 'guest' && !conn) note('Still connecting — check the code, or try another network.');
+    }, 10000);
+  });
+  peer.on('error', e => {
+    if (mode !== 'guest') return;
+    note(e.type === 'peer-unavailable' ? 'No room with that code. Check it and try again.'
+                                       : 'Connection problem (' + e.type + '). Try another network.');
+  });
+}
+function hostGone() {
+  if (mode !== 'guest') return;
+  leaveRoom(leaveReason || 'The host closed the room.');
+  leaveReason = '';
+}
+function kickedOut() {
+  leaveReason = '';
+  mode = 'off';
+  leaveRoom('The host removed you from the room.');
+}
+setInterval(() => { if (mode === 'guest' && conn) sendTo(conn, { t:'ping' }); }, HEARTBEAT);
+
+/* =======================================================================
+   Cards over the board.
+   ======================================================================= */
+function showChoose(words) {
+  const drawer = byId(G.drawerId);
+  const row = $('choiceRow');
+  row.textContent = '';
+  if (isDrawer() && words && words.length) {
+    $('chooseTitle').textContent = 'Choose a word to draw';
+    $('chooseSub').textContent = 'Pick one before the timer runs out, or one is picked for you.';
+    words.forEach((w, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = w;
+      b.onclick = () => { toHost({ t:'pick', i }); showCard(null); };
+      row.appendChild(b);
+    });
+  } else {
+    $('chooseTitle').textContent = (drawer ? drawer.name : 'Someone') + ' is choosing a word';
+    $('chooseSub').textContent = 'Get your typing fingers ready.';
+  }
+  showCard('cardChoose');
+}
+function showReveal(word, why) {
+  $('revealWord').textContent = word;
+  const ul = $('gains');
+  ul.textContent = '';
+  G.players.slice().sort((a, b) => (b.gain || 0) - (a.gain || 0) || b.score - a.score).forEach(p => {
+    const li = document.createElement('li');
+    const nm = document.createElement('span');
+    nm.textContent = p.name + (p.id === G.drawerId ? ' ✏️' : '');
+    const pts = document.createElement('span');
+    pts.className = p.gain ? 'plus' : 'zero';
+    pts.textContent = p.gain ? '+' + p.gain : '+0';
+    li.appendChild(nm); li.appendChild(pts);
+    ul.appendChild(li);
+  });
+  showCard('cardReveal');
+  say('The word was "' + word + '"' + (why ? ' — ' + why : '') + '.', 'sys');
+}
+function showOver() {
+  const ol = $('podium');
+  ol.textContent = '';
+  G.players.slice().sort((a, b) => b.score - a.score).forEach(p => {
+    const li = document.createElement('li');
+    const nm = document.createElement('span');
+    nm.textContent = p.name + (p.id === me.id ? ' (you)' : '');
+    const sc = document.createElement('span');
+    sc.textContent = p.score + ' points';
+    li.appendChild(nm); li.appendChild(sc);
+    ol.appendChild(li);
+  });
+  const winner = G.players.slice().sort((a, b) => b.score - a.score)[0];
+  if (winner) say(winner.name + ' wins with ' + winner.score + ' points!', 'good');
+  $('bAgain').style.display = mode === 'host' ? '' : 'none';
+  $('overNote').textContent = mode === 'host' ? '' : 'Waiting for the host to start another game.';
+  showCard('cardOver');
+}
+
+/* =======================================================================
+   Menu, settings and wiring.
+   ======================================================================= */
+function readSettings() {
+  if (mode !== 'host') return;
+  G.settings = {
+    rounds: clamp(+$('sRounds').value || 3, 1, 10),
+    drawTime: clamp(+$('sTime').value || 80, 30, 180),
+    hints: clamp(+$('sHints').value || 0, 0, 5),
+    custom: String($('custom').value || '').slice(0, 2000),
+    onlyCustom: $('sOnly').checked
+  };
+}
+function pushSettings() {
+  if (mode !== 'host') return;
+  readSettings();
+  broadcast({ t:'lobby', players:slim(), settings:G.settings, code:roomCode });
+}
+function fillSelect(el, values, fmt) {
+  for (const v of values) {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = fmt ? fmt(v) : v;
+    el.appendChild(o);
+  }
+}
+function buildSwatches() {
+  const box = $('swatches');
+  PIPS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.background = c;
+    b.title = 'Colour ' + (i + 1);
+    b.setAttribute('aria-label', 'Colour ' + (i + 1));
+    b.onclick = () => { me.color = i; paintSwatches(); saveMe(); };
+    box.appendChild(b);
+  });
+}
+function paintSwatches() {
+  [...$('swatches').children].forEach((b, i) => b.classList.toggle('on', i === me.color));
+}
+function saveMe() {
+  try {
+    localStorage.setItem('scribble.name', me.name);
+    localStorage.setItem('scribble.color', String(me.color));
+  } catch (e) {}
+}
+
+function init() {
+  buildTools();
+  buildSwatches();
+  fillSelect($('sRounds'), [1,2,3,4,5,6,8,10]);
+  fillSelect($('sTime'), [30,40,60,80,100,120,150,180], v => v + 's');
+  fillSelect($('sHints'), [0,1,2,3,4,5]);
+  $('sRounds').value = 3; $('sTime').value = 80; $('sHints').value = 2;
+  for (const id of ['sRounds','sTime','sHints','sOnly']) $(id).onchange = pushSettings;
+  $('custom').onchange = pushSettings;
+
+  let savedName = '', savedColor = null;
+  try {
+    savedName = localStorage.getItem('scribble.name') || '';
+    savedColor = localStorage.getItem('scribble.color');
+  } catch (e) {}
+  me.name = clean(savedName, '');
+  me.color = savedColor === null ? Math.random() * PIPS.length | 0 : clamp(+savedColor || 0, 0, PIPS.length - 1);
+  $('fName').value = me.name;
+  paintSwatches();
+  $('fName').oninput = () => { me.name = clean($('fName').value, ''); saveMe(); };
+
+  const fromLink = (location.hash || '').replace('#', '').toUpperCase() ||
+                   (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+  if (/^[A-Z0-9]{5}$/.test(fromLink)) {
+    $('fCode').value = fromLink;
+    note('Room ' + fromLink + ' is ready to join — put your name in and press Join.');
+  }
+
+  $('bHost').onclick = () => {
+    me.name = clean($('fName').value, 'Player');
+    $('fName').value = me.name; saveMe();
+    hostRoom();
+  };
+  $('bJoin').onclick = () => {
+    me.name = clean($('fName').value, 'Player');
+    $('fName').value = me.name; saveMe();
+    joinRoom();
+  };
+  $('fCode').onkeydown = e => { if (e.key === 'Enter') $('bJoin').click(); };
+  $('fName').onkeydown = e => { if (e.key === 'Enter') $('bHost').click(); };
+  $('bStart').onclick = () => { if (mode === 'host') hostStartGame(); };
+  $('bAgain').onclick = () => { if (mode === 'host') hostBackToLobby(); };
+  $('bLeave').onclick = () => leaveRoom('You left the room.');
+  $('bCopy').onclick = () => {
+    const link = inviteLink();
+    const done = () => { $('bCopy').textContent = 'Link copied!'; setTimeout(() => { $('bCopy').textContent = 'Copy invite link'; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, () => say(link, 'sys'));
+    else say(link, 'sys');
+  };
+
+  $('sayForm').onsubmit = e => {
+    e.preventDefault();
+    const text = $('say').value.trim();
+    $('say').value = '';
+    if (!text) return;
+    if (mode === 'off') { say('Create or join a room first.', 'sys'); return; }
+    toHost({ t:'chat', text });
+  };
+
+  window.addEventListener('beforeunload', () => { try { resetNet(); } catch (e) {} });
+
+  blankBoard();
+  showCard('cardMenu');
+  render();
+  say('Welcome to Scribble! Create a room, then share the code with up to 11 friends.', 'sys');
+}
+init();
+</script>
+</body>
+</html>
