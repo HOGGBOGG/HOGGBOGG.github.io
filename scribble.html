@@ -104,6 +104,12 @@
   #stage { position:relative; background:#fff; border-radius:10px; box-shadow:var(--shadow); overflow:hidden; }
   #pad { display:block; width:100%; height:auto; aspect-ratio:3/2; touch-action:none; background:#fff; cursor:default; }
   #pad.draw { cursor:crosshair; }
+  #nibring {
+    position:absolute; display:none; border-radius:50%; pointer-events:none;
+    transform:translate(-50%, -50%); border:2px solid #000;
+    box-shadow:0 0 0 1px rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.9);
+  }
+  #nibring.on { display:block; }
 
   /* tools */
   #tools { margin-top:8px; padding:8px; display:none; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -222,6 +228,7 @@
     <div id="stageCol">
       <div id="stage">
         <canvas id="pad" width="900" height="600" aria-label="Drawing board"></canvas>
+        <div id="nibring" aria-hidden="true"></div>
         <div id="cards" class="dim">
 
           <div class="card" id="cardMenu">
@@ -606,6 +613,7 @@ function renderTools() {
   const on = G.phase === 'draw' && isDrawer();
   $('tools').classList.toggle('on', on);
   pad.classList.toggle('draw', on);
+  if (!on) hideNib();
   $('say').placeholder = on ? 'You are drawing — chat is off for you' : 'Type your guess here';
   $('say').disabled = on;
 }
@@ -709,6 +717,29 @@ function applyDraw(d) {
 
 function clearBoard() { ops = []; blankBoard(); }
 
+/* The system crosshair says where you are but not how wide the brush is, which
+   with a 38px nib is most of what you want to know. This ring says both. */
+const nibRing = $('nibring');   // not id="nib": that would shadow the brush-size variable
+let nibShown = false;
+function showNib(e) {
+  if (!canDraw() || e.pointerType === 'touch') return hideNib();
+  const r = pad.getBoundingClientRect();
+  const scale = r.width / CW;
+  const size = Math.max(8, (tool === 'fill' ? 12 : nib) * scale);
+  nibRing.style.width = size + 'px';
+  nibRing.style.height = size + 'px';
+  nibRing.style.left = (e.clientX - r.left) + 'px';
+  nibRing.style.top = (e.clientY - r.top) + 'px';
+  nibRing.style.borderColor = tool === 'erase' ? '#ffffff' : ink;
+  nibRing.classList.add('on');
+  nibShown = true;
+}
+function hideNib() {
+  if (!nibShown) return;
+  nibRing.classList.remove('on');
+  nibShown = false;
+}
+
 /* ---------------- pointer input (drawer only) ---------------- */
 function boardPos(e) {
   const r = pad.getBoundingClientRect();
@@ -732,6 +763,7 @@ function flushStroke(force) {
 
 pad.addEventListener('pointerdown', e => {
   if (!canDraw()) return;
+  showNib(e);
   const { x, y } = boardPos(e);
   pad.setPointerCapture(e.pointerId);
   if (tool === 'fill') {
@@ -743,7 +775,9 @@ pad.addEventListener('pointerdown', e => {
   sentPts = 0; lastSend = 0;
   flushStroke(true);
 });
+pad.addEventListener('pointerenter', showNib);
 pad.addEventListener('pointermove', e => {
+  showNib(e);
   if (!stroke || !canDraw()) return;
   const { x, y } = boardPos(e);
   const n = stroke.p.length;
@@ -752,6 +786,10 @@ pad.addEventListener('pointermove', e => {
   flushStroke(false);
 });
 function endStroke() { flushStroke(true); stroke = null; }
+pad.addEventListener('pointerleave', hideNib);
+pad.addEventListener('pointerout', hideNib);
+window.addEventListener('blur', hideNib);
+window.addEventListener('resize', hideNib);          // the ring is sized against the board's on-screen width
 pad.addEventListener('pointerup', endStroke);
 pad.addEventListener('pointercancel', endStroke);
 pad.addEventListener('pointerleave', endStroke);
@@ -761,6 +799,7 @@ window.addEventListener('blur', endStroke);
 function paintTools() {
   for (const b of $('palette').children) b.classList.toggle('on', b.dataset.c === ink && tool !== 'erase');
   for (const b of $('sizes').children) b.classList.toggle('on', +b.dataset.s === nib);
+  hideNib();                                   // it is re-sized on the next move
   $('tBrush').classList.toggle('on', tool === 'brush');
   $('tFill').classList.toggle('on', tool === 'fill');
   $('tErase').classList.toggle('on', tool === 'erase');
