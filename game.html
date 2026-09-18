@@ -173,6 +173,19 @@ const MOD_STACK_MAX = 3;   // how deep one mod can stack on a weapon
 const MOD_SLOTS = 6;       // how many mods total a weapon can carry
 const ELITE_FROM = 3;
 
+/* ---------------- CONFIG: enemy modifiers ---------------- */
+// Any ordinary enemy can turn up wearing one of these. With a big squad the
+// wave sends fewer bodies and more of them are modified, so the pressure comes
+// from quality rather than quantity.
+const ZMODS = {
+  fetid:   { name:'Fetid',   hp:1.7, speed:.95, dmg:1.25, pts:2.5, r:1.08, tint:'#8fc43a', desc:'trails toxic sludge and bursts into gas' },
+  evolved: { name:'Evolved', hp:2.6, speed:1.18, dmg:1.40, pts:4,   r:1.14, tint:'#6fd1c6', desc:'regenerates and lunges' },
+  apex:    { name:'Apex',    hp:5.0, speed:1.05, dmg:1.70, pts:9,   r:1.30, tint:'#ff9f1a', desc:'armoured, hits like a truck, drops gear' }
+};
+const ZMOD_KEYS = Object.keys(ZMODS);
+const ZMOD_FROM = 4;          // first wave modified enemies appear
+const SAVAGE_FROM = 8;        // first wave a boss can turn up savage
+
 /* ---------------- CONFIG: player classes ---------------- */
 const CLASSES = {
   soldier: { name:'Soldier', hp:110, speed:202, mass:6, dmg:1.00, start:'m4a1',
@@ -236,6 +249,29 @@ const MODIFIERS = {
 };
 const MODIFIERS_FROM = 3, TWO_MODIFIERS_FROM = 9;
 
+/* ---------------- CONFIG: random world events ---------------- */
+// These roll in mid wave, announce themselves, run for a while and leave.
+const EVENTS = {
+  snowstorm: { name:'Snowstorm',          dur:34, color:'#bfe9ff', desc:'Everything slows. Ice bursts out of the ground.' },
+  eruption:  { name:'Volcanic eruption',  dur:30, color:'#ff7a2f', desc:'The floor splits open. Keep moving.' },
+  meteors:   { name:'Meteor shower',      dur:28, color:'#ffb347', desc:'Rocks fall where you stand.' },
+  quake:     { name:'Earthquake',         dur:24, color:'#c9a227', desc:'Shockwaves roll across the map.' },
+  acidrain:  { name:'Acid rain',          dur:28, color:'#b6e04a', desc:'Acid pools anywhere and everywhere.' },
+  bloodmoon: { name:'Blood moon',         dur:30, color:'#e2735f', desc:'The horde turns rabid and fast.' },
+  surge:     { name:'Power surge',        dur:26, color:'#c6ff5a', desc:'Your weapons scream. Fire away.' }
+};
+const EVENT_KEYS = Object.keys(EVENTS);
+const EVENT_FROM = 3, EVENT_GAP = [50, 95];
+
+/* ---------------- CONFIG: squad ultimates ---------------- */
+// Hold G together. The more of you that call it at once, the bigger it gets.
+const ULTIMATES = [
+  { need:2, name:'Airstrike',           color:'#ff9a3c', desc:'carpet bombs the area' },
+  { need:4, name:'Firestorm',           color:'#ff5a3c', desc:'rings of fire sweep the field' },
+  { need:6, name:'Aegis Protocol',      color:'#6fd1c6', desc:'revives, heals and shields the squad' },
+  { need:8, name:'Extinction Protocol', color:'#c77ddb', desc:'wipes the field and cracks bosses open' }
+];
+
 /* ---------------- CONFIG: online squad ---------------- */
 const MAX_PLAYERS = 10;
 const PLAYER_COLORS = [
@@ -270,7 +306,12 @@ const ZT = {
   necroz:  { hp:110, speed:[40,50],   r:15, dmg:8,  mass:2.2, body:'#2e2a3a', head:'#a9f0c8', pts:50, from:7, weight:1.2, necro:true },
   ghoul:   { hp:70,  speed:[70,80],   r:13, dmg:14, mass:1.8, body:'#3d4a55', head:'#9fb3c2', pts:30, from:8, weight:3, dash:true },
   stalker: { hp:95,  speed:[95,115],  r:14, dmg:16, mass:2.2, body:'#402f4d', head:'#c0a0e0', pts:40, from:9, weight:2, ranged:'void' },
-  hulk:    { hp:700, speed:[30,38],   r:28, dmg:32, mass:12,  body:'#4a4030', head:'#8a7a56', pts:110, from:11, weight:1 }
+  hulk:    { hp:700, speed:[30,38],   r:28, dmg:32, mass:12,  body:'#4a4030', head:'#8a7a56', pts:110, from:11, weight:1 },
+  leaper:  { hp:85,  speed:[95,115],  r:13, dmg:18, mass:1.8, body:'#4a5d2a', head:'#9fc46a', pts:35, from:5,  weight:3,   leap:true },
+  charger: { hp:210, speed:[58,70],   r:19, dmg:26, mass:6.5, body:'#6b3a2a', head:'#c07a4a', pts:55, from:7,  weight:2,   charge:true },
+  weaver:  { hp:85,  speed:[80,95],   r:13, dmg:10, mass:1.8, body:'#2f4a6b', head:'#7aa2d0', pts:40, from:8,  weight:2.5, ranged:'ice', strafe:true },
+  screamer:{ hp:130, speed:[55,65],   r:15, dmg:8,  mass:2.2, body:'#5a2a4a', head:'#d07ab0', pts:50, from:9,  weight:1.5, scream:true },
+  burrower:{ hp:120, speed:[70,85],   r:14, dmg:22, mass:2.2, body:'#3a2f24', head:'#8a6a45', pts:45, from:10, weight:2,   burrow:true }
 };
 // Elites are rarer, much tougher, and fire dense bullet-hell patterns.
 // They fire faster the more players are in the game.
@@ -412,6 +453,11 @@ let gameMode = 'coop';
 let myClass = 'soldier';
 let netHeld = {}, netTaps = {};
 let kickOpen = false, lastPing = 0, myPing = 0, pingSeq = 0, lastSnapAt = 0;
+// client side prediction: every frame of local input is kept so it can be
+// replayed on top of whatever position the host last confirmed
+let inSeq = 0, lastAck = 0, snapDt = .08, simClock = 0, lastSnapSim = 0;
+const inHist = [];
+const IN_HIST_SECS = .8;
 // Projectiles are replicated as spawn events plus early deaths; guests fly them
 // locally. A straight line needs one packet, not one per tick for its whole life.
 let evTick = 0;
@@ -432,6 +478,18 @@ function inTap(i, a) {
   return !!(netTaps[i] && netTaps[i][a]);
 }
 
+// Host authority and guest prediction must move a player identically or
+// reconciliation fights itself, so both go through this.
+function moveStep(p, mx, my, dt) {
+  if (mx || my) {
+    const l = Math.hypot(mx, my); mx /= l; my /= l;
+    p.dx = mx; p.dy = my; p.walk += dt * 12;
+  }
+  const spd = pSpeed(p);
+  p.x += mx * spd * dt; p.y += my * spd * dt;
+  solid(p);
+  return p;
+}
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -565,11 +623,15 @@ let barrels = [], particles = [], pickups = [], loot = [], texts = [], banners =
 let minions = [], feed = [];
 let toSpawn = 0, spawnT = 0, intermission = 0, bossPending = false, bossDelay = 0;
 let miniQueue = 0, miniT = 0, bossOrder = [];
-let clearT = 0, activeMods = new Set(), nextMods = [], teamEnergy = 0, strikes = [], meds = [];
+let clearT = 0, activeMods = new Set(), nextMods = [], teamEnergy = 0, strikes = [], meds = [], ultPending = 0;
 let eliteAt = new Set(), boomDepth = 0;
 let camX = WW / 2, camY = WH / 2, zoom = ZMIN;
 let mastery = {};
 let teamScore = [0, 0], pvpEnd = '', pvpDropT = 0;
+let wEvent = null, wEventT = 0, wEventNext = rand(...EVENT_GAP), wEventTick = 0;
+const evSpeedP = () => wEvent === 'snowstorm' ? .86 : 1;
+const evSpeedZ = () => wEvent === 'snowstorm' ? .9 : wEvent === 'bloodmoon' ? 1.3 : 1;
+const evRate = () => wEvent === 'surge' ? .62 : 1;
 let best = 0;
 try { best = +localStorage.getItem('blockrot-best') || 0; } catch (e) {}
 
@@ -590,10 +652,44 @@ function newPlayer(i, name, clsId, team) {
 const cdef = p => CLASSES[p.cls] || CLASSES.soldier;
 const up = (p, id) => (p.up && p.up[id]) || 0;
 const maxHp = p => Math.round(cdef(p).hp + 22 * up(p, 'armor'));
-const pSpeed = p => cdef(p).speed * (1 + .06 * up(p, 'speed')) * (p.buffSpeed || 1) * (p.slow > 0 ? .6 : 1);
+const pSpeed = p => cdef(p).speed * (1 + .06 * up(p, 'speed')) * (p.buffSpeed || 1) * (p.slow > 0 ? .6 : 1) * evSpeedP();
 const pMass = p => cdef(p).mass * (1 + .15 * up(p, 'mass')) * (p.abT > 0 && p.cls === 'tank' ? 2 : 1);
 const teamSize = () => players.filter(p => !p.gone).length || 1;
-const crowd = () => 1 + .35 * Math.max(0, teamSize() - 2);
+// Count grows slowly with the squad; strength grows faster. Eight players face
+// roughly the same number of enemies as four, but much nastier ones.
+const crowd = () => 1 + .09 * Math.max(0, teamSize() - 2);
+const power = () => 1 + .28 * Math.max(0, teamSize() - 2);
+function mixHex(a, b, t) {
+  const pa = [1, 3, 5].map(i => parseInt(a.substr(i, 2), 16));
+  const pb = [1, 3, 5].map(i => parseInt(b.substr(i, 2), 16));
+  return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function rollZMod() {
+  if (wave < ZMOD_FROM) return null;
+  const chance = clamp(.05 + wave * .012 + .05 * Math.max(0, teamSize() - 2), 0, .6);
+  if (Math.random() > chance) return null;
+  const apexW = clamp(.05 + wave * .005 + .01 * teamSize(), 0, .26);
+  const evoW = clamp(.28 + wave * .006, 0, .44);
+  const r = Math.random();
+  return r < apexW ? 'apex' : r < apexW + evoW ? 'evolved' : 'fetid';
+}
+function applyZMod(z, id) {
+  const M = ZMODS[id];
+  if (!M) return z;
+  z.zmod = id;
+  z.hp *= M.hp; z.max *= M.hp;
+  z.speed *= M.speed;
+  z.dmg = Math.round(z.dmg * M.dmg);
+  z.pts = Math.round(z.pts * M.pts);
+  z.r = Math.round(z.r * M.r);
+  z.mass *= 1.4;
+  z.body = mixHex(z.body, M.tint, .38);
+  z.head = mixHex(z.head, M.tint, .5);
+  if (id === 'apex') z.armor = .35;                  // shrugs off a third of everything
+  if (id === 'evolved') { z.regen = z.max * .035; z.dash = true; z.dcd = rand(2, 4); }
+  if (id === 'fetid') z.sludge = .7;
+  return z;
+}
 const masteryNeed = lv => Math.round(MASTERY_NEED[lv] * Math.max(1, teamSize() / 2));
 const energyMax = () => Math.round(ENERGY_MAX * Math.max(1, teamSize() / 2));
 const buildCap = p => 6 + 2 * up(p, 'kit');
@@ -673,7 +769,7 @@ function stats(s, p) {
   if (st('hollow')) crit += .12 * st('hollow');
   if (p) {
     dmg *= cdef(p).dmg * (1 + .08 * up(p, 'power')) * (p.buffDmg || 1);
-    rate *= Math.pow(.94, up(p, 'rapid')) * (p.buffRate || 1);
+    rate *= Math.pow(.94, up(p, 'rapid')) * (p.buffRate || 1) * evRate();
     crit += .05 * up(p, 'crit');
     blastMul *= 1 + .15 * up(p, 'blast');
   }
@@ -735,7 +831,8 @@ function startGame() {
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = []; minions = []; feed = []; corpses = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
   bossPending = false; clearT = 0; activeMods = new Set(); nextMods = []; hazards = [];
-  teamEnergy = 0; strikes = []; meds = []; miniQueue = 0; toSpawn = 0;
+  wEvent = null; wEventT = 0; wEventNext = rand(...EVENT_GAP);
+  teamEnergy = 0; strikes = []; meds = []; miniQueue = 0; toSpawn = 0; ultPending = 0;
   resetGround();
   for (const p of players) giveStartWeapons(p);
   if (PVP()) startPvp(); else nextWave();
@@ -856,7 +953,7 @@ function nextWave() {
   // Hundreds of little enemies is what used to melt the host. Anything past the
   // wave cap is paid out as minibosses instead, so the pressure keeps climbing
   // while the entity count stays sane.
-  const cap = Math.round(36 + 9 * teamSize());
+  const cap = Math.round(32 + 5 * teamSize());
   miniQueue = 0;
   if (budget > cap) {
     const excess = budget - cap;
@@ -900,10 +997,11 @@ function makeZombie(type, x, y, inside) {
   const T = ZT[type];
   const scale = (1 + (wave - 1) * .09) * (activeMods.has('armored') ? 1.5 : 1) * (activeMods.has('swarm') ? .7 : 1);
   return {
-    id: nextId++, type, x, y, r: T.r, hp: T.hp * scale, max: T.hp * scale, mass: T.mass,
+    id: nextId++, type, x, y, r: T.r, hp: T.hp * scale * power(), max: T.hp * scale * power(), mass: T.mass,
     speed: rand(...T.speed) * (1 + wave * .012) * (activeMods.has('frenzy') ? 1.35 : 1),
-    dmg: T.dmg, body: T.body, head: T.head, pts: T.pts,
+    dmg: Math.round(T.dmg * (1 + .06 * Math.max(0, teamSize() - 2))), body: T.body, head: T.head, pts: T.pts,
     ranged: T.ranged, bloat: T.bloat, shield: T.shield, split: T.split, necro: T.necro, dash: T.dash,
+    leap: T.leap, charge: T.charge, strafe: T.strafe, scream: T.scream, burrow: T.burrow,
     atk: 0, shoot: rand(1.5, 3), heal: 3, dcd: rand(1, 3), dashT: 0,
     inside, wob: rand(0, 6.28), flash: 0, dx: 0, dy: 1, walk: 0, burn: 0, burnDps: 0
   };
@@ -926,25 +1024,35 @@ function spawnZombie() {
   if (eliteAt.has(toSpawn)) {
     makeElite(z);
     banner(`An elite ${type} is here: ${ELITE_PATTERNS[z.ep].desc}`, '#f2d27a');
+  } else {
+    const m = rollZMod();
+    if (m) {
+      applyZMod(z, m);
+      if (m === 'apex') banner(`An Apex ${type} is coming: ${ZMODS.apex.desc}`, ZMODS.apex.tint);
+    }
   }
   zombies.push(z);
 }
 function bossStats(key, mini) {
   const B = BOSS_BY_KEY[key];
   const idx = Math.max(0, Math.floor(wave / BOSS_EVERY) - 1);
-  let hp = B.hp * (1 + wave * .08) * (1 + idx * .3) * crowd();
+  let hp = B.hp * (1 + wave * .08) * (1 + idx * .3) * crowd() * power();
   if (mini) hp *= MINI_HP;
   return { B, hp };
 }
-function makeBoss(key, x, y, mini) {
+const rollSavage = () => wave >= SAVAGE_FROM && Math.random() < clamp(.12 + wave * .012 + .03 * teamSize(), 0, .55);
+function makeBoss(key, x, y, mini, savage) {
   const { B, hp } = bossStats(key, mini);
+  const sv = !!savage;
   const z = {
-    id: nextId++, type: 'boss', key, boss: true, mini: !!mini,
-    name: mini ? 'Lesser ' + B.name.replace(/^The /, '') : B.name,
-    x, y, r: mini ? Math.round(B.r * MINI_R) : B.r, hp, max: hp,
-    speed: B.speed * (mini ? 1.1 : 1), dmg: Math.round(B.dmg * (mini ? .7 : 1)), mass: B.mass * (mini ? .5 : 1),
-    body: B.body, head: B.head, pts: mini ? 300 : 1000,
-    atk: 0, t1: 3, t2: 2, t3: 4, t4: 6, blinkT: 0, chargeT: 0, phase: 0,
+    id: nextId++, type: 'boss', key, boss: true, mini: !!mini, savage: sv,
+    name: (sv ? 'Savage ' : '') + (mini ? 'Lesser ' + B.name.replace(/^The /, '') : B.name),
+    x, y, r: Math.round((mini ? B.r * MINI_R : B.r) * (sv ? 1.12 : 1)), hp: hp * (sv ? 1.9 : 1), max: hp * (sv ? 1.9 : 1),
+    speed: B.speed * (mini ? 1.1 : 1) * (sv ? 1.12 : 1),
+    dmg: Math.round(B.dmg * (mini ? .7 : 1) * (sv ? 1.3 : 1)), mass: B.mass * (mini ? .5 : 1),
+    body: sv ? mixHex(B.body, '#a8161f', .45) : B.body, head: sv ? mixHex(B.head, '#ff5a3c', .4) : B.head,
+    pts: (mini ? 300 : 1000) * (sv ? 2 : 1),
+    atk: 0, t1: 3, t2: 2, t3: 4, t4: 6, t5: 5, blinkT: 0, chargeT: 0, phase: 0,
     inside: false, wob: 0, flash: 0, dx: 0, dy: 1, walk: 0, burn: 0, burnDps: 0
   };
   zombies.push(z);
@@ -954,14 +1062,14 @@ function spawnBoss() {
   const idx = wave / BOSS_EVERY - 1;
   const key = bossOrder[idx % bossOrder.length];
   const gt = farGate();
-  const z = makeBoss(key, gt.x, gt.y, false);
-  banner(z.name + ' has arrived', '#e2735f', true);
+  const z = makeBoss(key, gt.x, gt.y, false, rollSavage());
+  banner(z.name + ' has arrived' + (z.savage ? ': savage, and it drops something rare' : ''), '#e2735f', true);
   addShake(12);
 }
 function spawnMini() {
   const key = pick(bossOrder);
   const gt = farGate();
-  const z = makeBoss(key, gt.x + (gt.jx ? rand(-40, 40) : 0), gt.y + (gt.jy ? rand(-40, 40) : 0), true);
+  const z = makeBoss(key, gt.x + (gt.jx ? rand(-40, 40) : 0), gt.y + (gt.jy ? rand(-40, 40) : 0), true, wave >= SAVAGE_FROM && Math.random() < .2);
   banner(z.name + ' broke through the gate', '#e2735f');
   addShake(6);
 }
@@ -1348,7 +1456,7 @@ const hurtDot = (p, d) => damagePlayer(p, d, null, 0);
 
 /* ---------------- damage, kills, mastery ---------------- */
 function damage(z, d, owner, slot, kx, ky, bypass) {
-  if (z.dead) return;
+  if (z.dead || z.hidden) return;
   if (z.shield && !bypass) {
     const s = Math.hypot(kx, ky) || 1;
     if ((kx / s) * z.dx + (ky / s) * z.dy < -.35) {
@@ -1356,6 +1464,7 @@ function damage(z, d, owner, slot, kx, ky, bypass) {
       burst(z.x + z.dx * z.r, z.y + z.dy * z.r, '#c9ccd2', 2, 90, 3);
     }
   }
+  if (z.armor) d *= 1 - z.armor;
   z.hp -= d; z.flash = .08;
   if (slot) {
     const cryo = modCount(slot, 'cryo');
@@ -1412,6 +1521,8 @@ function kill(z, owner, slot) {
     if (owner.cls === 'necro' && !z.boss && Math.random() < .12)
       spawnMinion(owner, 'undead', 22, z.x, z.y);
   }
+  if (z.zmod === 'fetid') { puddles.push({ x: z.x, y: z.y, r: 64, life: 7 }); burst(z.x, z.y, ZMODS.fetid.tint, 18, 200, 6); }
+  if (z.zmod === 'apex') dropLoot(z.x, z.y, Math.random() < .55 ? rollMod() : { kind:'weapon', id: rollWeaponId(), rarity:'rare' });
   splat(z.x, z.y, z.r, 'rgba(110,22,18,.55)');
   burst(z.x, z.y, z.body, z.boss ? 40 : 10, z.boss ? 300 : 180, z.boss ? 9 : 5);
   if (corpses.length < 60) corpses.push({ x: z.x, y: z.y, life: 14 });
@@ -1510,7 +1621,8 @@ function bossDeath(z, owner) {
   const n = teamSize();
   const items = [rollRare()];
   while (items.length < Math.max(2, n)) items.push(Math.random() < .35 + idx * .2 ? rollLegendary() : rollRare());
-  if (idx >= 1 && !items.some(i => i.rarity === 'legendary')) items[1] = rollLegendary();
+  if ((idx >= 1 || z.savage) && !items.some(i => i.rarity === 'legendary')) items[1] = rollLegendary();
+  if (z.savage) items.push(rollLegendary(), rollMod());
   for (let k = 0; k < Math.max(2, Math.ceil(n / 2) + 1); k++) items.push(rollMod());
   const ringR = 50 + items.length * 7;
   items.forEach((it, k) => {
@@ -1653,30 +1765,174 @@ function throwMedkit(p) {
   p.medCd = MEDKIT_CD * Math.pow(.88, up(p, 'cool'));
   meds.push({ from: p, to: target, x: p.x, y: p.y, sx: p.x, sy: p.y, t: 0, dur: .55 });
 }
+const bestUlt = n => ULTIMATES.filter(u => u.need <= n).pop() || null;
+const readyUlt = () => bestUlt(players.filter(q => q.alive && !q.gone).length);
 function tryStrike(p) {
-  if (PVP()) { floatText(p.x, p.y - 34, 'No airstrikes in PVP', '#8f8870'); return; }
+  if (PVP()) { floatText(p.x, p.y - 34, 'No ultimates in PVP', '#8f8870'); return; }
   p.strikeT = time;
-  if (teamEnergy < energyMax()) { floatText(p.x, p.y - 34, `Airstrike ${Math.floor(teamEnergy / energyMax() * 100)}% charged`, '#8f8870'); return; }
-  const alive = players.filter(q => q.alive && !q.gone);
-  const pressing = alive.filter(q => time - q.strikeT <= STRIKE_WINDOW);
-  if (pressing.length < Math.min(2, alive.length)) {
-    floatText(p.x, p.y - 34, 'Waiting for a teammate to press too...', '#f2d27a');
+  if (teamEnergy < energyMax()) {
+    floatText(p.x, p.y - 34, `Ultimate ${Math.floor(teamEnergy / energyMax() * 100)}% charged`, '#8f8870');
     return;
   }
-  teamEnergy = 0;
+  // Hold the call open a moment so the rest of the squad can pile on and
+  // upgrade it: two of you get an airstrike, all eight get an extinction.
+  if (ultPending <= 0) {
+    ultPending = STRIKE_WINDOW;
+    floatText(p.x, p.y - 40, 'Calling it in...', '#f2d27a');
+  }
+}
+function resolveUlt() {
+  const alive = players.filter(q => q.alive && !q.gone);
+  const pressing = alive.filter(q => time - q.strikeT <= STRIKE_WINDOW + .2);
+  const ult = bestUlt(pressing.length);
   for (const q of players) q.strikeT = -9;
-  banner(`Airstrike inbound (called by ${pressing.map(q => q.name).join(' + ')})`, '#ff9a3c', true);
+  if (!ult) { banner(`Not enough of you on G at once (need ${ULTIMATES[0].need})`, '#8f8870'); return; }
+  teamEnergy = 0;
+  fireUlt(ult, pressing);
+}
+function fireUlt(ult, pressing) {
   const cx = pressing.reduce((a, q) => a + q.x, 0) / pressing.length;
   const cy = pressing.reduce((a, q) => a + q.y, 0) / pressing.length;
-  const vw = 750, vh = 480;
-  const inView = zombies.filter(z => Math.abs(z.x - cx) < vw && Math.abs(z.y - cy) < vh);
-  inView.sort((a, b) => b.max - a.max);
-  for (let k = 0; k < 16; k++) {
-    const tg = inView.length ? inView[k % inView.length] : null;
-    const x = tg ? tg.x + rand(-40, 40) : cx + rand(-vw, vw) * .8;
-    const y = tg ? tg.y + rand(-40, 40) : cy + rand(-vh, vh) * .8;
-    strikes.push({ x, y, t: .6 + k * .1, max: .6 + k * .1, owner: pressing[k % pressing.length] });
+  banner(`${ult.name}: ${ult.desc} (${pressing.length} callers)`, ult.color, true);
+  addShake(10);
+  if (ult.need >= 8) {
+    for (let k = 0; k < 3; k++) addRing(cx, cy, 1400, 700 + k * 120, 0, '#c77ddb');
+    for (const z of zombies) {
+      if (z.dead) continue;
+      damage(z, z.boss ? 1500 + z.max * .12 : 900 + z.max * .3, pressing[0], null, z.x - cx, z.y - cy, true);
+    }
+    for (const q of players) {
+      if (q.gone) continue;
+      if (!q.alive) q.alive = true;
+      q.hp = maxHp(q);
+      for (const sl of q.slots) sl.ammo = sl.max;
+      burst(q.x, q.y, '#c77ddb', 24, 240, 6);
+    }
+    addShake(14);
+  } else if (ult.need >= 6) {
+    for (const q of players) {
+      if (q.gone) continue;
+      if (!q.alive) { q.alive = true; q.rev = 0; banner(q.name + ' is back up', '#8fd67a'); }
+      q.hp = maxHp(q);
+      q.shieldMax = 160; q.shield = 160;
+      q.buffRate = .62; q.buffSpeed = 1.25; q.abT = Math.max(q.abT, 10);
+      for (let k = 0; k < 2; k++) spawnMinion(q, 'drone', 12);
+      burst(q.x, q.y, '#6fd1c6', 20, 200, 5);
+    }
+    addRing(cx, cy, 700, 420, 0, '#6fd1c6');
+  } else if (ult.need >= 4) {
+    for (let k = 0; k < 3; k++) addRing(cx, cy, 1100, 480 + k * 90, 120, '#ff5a3c');
+    for (let k = 0; k < 10; k++) {
+      const a = k / 10 * 6.283, r = rand(140, 460);
+      addZone(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 96, 1.0, 90, '#ff5a3c');
+    }
+    for (const z of zombies) if (!z.dead && dist(z, { x: cx, y: cy }) < 900) {
+      z.burn = 3; z.burnDps = Math.max(z.burnDps || 0, 40); z.burnOwner = pressing[0];
+    }
+  } else {
+    const vw = 750, vh = 480;
+    const inView = zombies.filter(z => Math.abs(z.x - cx) < vw && Math.abs(z.y - cy) < vh);
+    inView.sort((a, b) => b.max - a.max);
+    for (let k = 0; k < 16; k++) {
+      const tg = inView.length ? inView[k % inView.length] : null;
+      const x = tg ? tg.x + rand(-40, 40) : cx + rand(-vw, vw) * .8;
+      const y = tg ? tg.y + rand(-40, 40) : cy + rand(-vh, vh) * .8;
+      strikes.push({ x, y, t: .6 + k * .1, max: .6 + k * .1, owner: pressing[k % pressing.length] });
+    }
   }
+}
+
+/* ---------------- random world events ---------------- */
+function startEvent(key) {
+  wEvent = key || pick(EVENT_KEYS);
+  const E = EVENTS[wEvent];
+  wEventT = E.dur;
+  wEventTick = 0;
+  banner(E.name + ': ' + E.desc, E.color, true);
+  addShake(6);
+}
+function endEvent() {
+  if (wEvent) banner(EVENTS[wEvent].name + ' passes', '#8f8870');
+  wEvent = null; wEventT = 0;
+  wEventNext = rand(...EVENT_GAP);
+}
+function updateEvent(dt) {
+  if (!wEvent) {
+    if (PVP() || wave < EVENT_FROM) return;
+    wEventNext -= dt;
+    if (wEventNext <= 0) startEvent();
+    return;
+  }
+  wEventT -= dt;
+  if (wEventT <= 0) { endEvent(); return; }
+  wEventTick -= dt;
+  const alive = players.filter(q => q.alive && !q.gone);
+  if (wEventTick > 0) return;
+  switch (wEvent) {
+    case 'snowstorm':
+      wEventTick = 2.2;
+      for (const q of alive) { const h = addZone(q.x + rand(-220, 220), q.y + rand(-220, 220), 76, 1.4, 22, '#b8e8ff'); if (h) h.chill = true; }
+      break;
+    case 'eruption':
+      wEventTick = 1.5;
+      for (let k = 0; k < 2; k++) addZone(rand(200, WW - 200), rand(200, WH - 200), 96, 1.5, 34, '#ff7a2f');
+      if (alive.length) addZone(pick(alive).x + rand(-150, 150), pick(alive).y + rand(-150, 150), 88, 1.3, 34, '#ff7a2f');
+      break;
+    case 'meteors':
+      wEventTick = 2.6;
+      for (const q of alive) addZone(q.x + rand(-170, 170), q.y + rand(-170, 170), 92, 1.5, 36, '#ffb347');
+      break;
+    case 'quake':
+      wEventTick = 3.2;
+      addShake(5);
+      addRing(rand(300, WW - 300), rand(300, WH - 300), 700, 420, 26, '#c9a227');
+      break;
+    case 'acidrain':
+      wEventTick = 1.1;
+      for (let k = 0; k < 3; k++) {
+        const [px, py] = freeSpot(rand(120, WW - 120), rand(120, WH - 120), 20);
+        puddles.push({ x: px, y: py, r: 40, life: 7 });
+      }
+      break;
+    case 'bloodmoon':
+      wEventTick = 4;
+      break;
+    case 'surge':
+      wEventTick = 4;
+      for (const q of alive) burst(q.x, q.y, '#c6ff5a', 6, 120, 4);
+      break;
+  }
+}
+function drawEventOverlay() {
+  if (!wEvent) return;
+  const E = EVENTS[wEvent];
+  const fade = Math.min(1, wEventT / 3) * Math.min(1, (EVENTS[wEvent].dur - wEventT) / 2 + .3);
+  ctx.fillStyle = E.color + (wEvent === 'surge' ? '10' : '1e');
+  ctx.fillRect(0, AY, W, H - AY);
+  if (wEvent === 'snowstorm') {
+    ctx.fillStyle = 'rgba(230,248,255,.7)';
+    for (let i = 0; i < 90; i++) {
+      const x = (i * 149 + time * 120) % W, y = (i * 83 + time * 220 + Math.sin(time + i) * 30) % (H - AY) + AY;
+      ctx.fillRect(x, y, 3, 3);
+    }
+  } else if (wEvent === 'eruption') {
+    ctx.fillStyle = 'rgba(255,140,60,.5)';
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 197 + Math.sin(time * .6 + i) * 60) % W, y = (H - (i * 71 + time * 90) % (H - AY));
+      ctx.fillRect(x, y, 3, 5);
+    }
+  } else if (wEvent === 'acidrain') {
+    ctx.strokeStyle = 'rgba(182,224,74,.35)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 131 + time * 60) % W, y = (i * 97 + time * 700) % (H - AY) + AY;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 14); ctx.stroke();
+    }
+  }
+  ctx.textAlign = 'center'; ctx.font = `bold 15px ${FONT}`;
+  ctx.globalAlpha = Math.min(1, fade + .4);
+  ctx.fillStyle = E.color;
+  ctx.fillText(`${E.name}  ·  ${Math.ceil(wEventT)}s`, W / 2, H - 76);
+  ctx.globalAlpha = 1;
 }
 
 /* ---------------- shop: random offers, infinite levels ---------------- */
@@ -1782,11 +2038,61 @@ function updateCam(dt, snap) {
 /* ---------------- boss brains ---------------- */
 function bossBrain(z, t, tdx, tdy, bd, dt) {
   const rage = z.hp < z.max * .4 ? .65 : 1;
-  const slow = z.mini ? 1.5 : 1;            // minibosses attack less often
+  const slow = (z.mini ? 1.5 : 1) * (z.savage ? .78 : 1);   // savage ones attack harder and faster
   const rg = rage * slow;
   const a = Math.atan2(tdy, tdx);
   const room = () => zombies.length + newZ.length < spawnCap();
-  z.t1 -= dt; z.t2 -= dt; z.t3 -= dt; z.t4 -= dt;
+  z.t1 -= dt; z.t2 -= dt; z.t3 -= dt; z.t4 -= dt; z.t5 -= dt;
+  if (!z.enraged && z.hp < z.max * .3) {
+    z.enraged = true;
+    banner(z.name + ' is enraged', '#ff5a3c');
+    addShake(8);
+    addRing(z.x, z.y, 620, 520, 22, '#ff5a3c');
+  }
+  if (z.enraged && z.t5 <= 0) {                      // desperation move, one per boss
+    z.t5 = 6 * rg;
+    switch (z.key) {
+      case 'brood':
+        if (room()) for (let k = 0; k < 5; k++) newZ.push(makeZombie('crawler', z.x + rand(-70, 70), z.y + rand(-70, 70), true));
+        for (let k = 0; k < 3; k++) addZone(t.x + rand(-180, 180), t.y + rand(-180, 180), 80, 1.2, 26, '#c7a86b');
+        break;
+      case 'pyre':
+        for (let k = 0; k < 8; k++) addZone(z.x + Math.cos(k / 8 * 6.283) * 200, z.y + Math.sin(k / 8 * 6.283) * 200, 84, 1.1, 32, '#ff7a2f');
+        for (let k = 0; k < 10; k++) eShot(z.x, z.y, k / 10 * 6.283 + time, 230, 'fire');
+        break;
+      case 'wraith':
+        for (let k = -1; k <= 1; k++) addBeam(z, a + k * .9, 900, .5, .6, 1.1, 20, '#9ad7ff');
+        break;
+      case 'colossus':
+        for (let k = 0; k < 3; k++) addRing(z.x, z.y, 700, 380 + k * 90, Math.round(z.dmg * .6), '#8c969e');
+        break;
+      case 'tyrant':
+        z.spin = (z.spin || 0) + 1.1;
+        for (let k = 0; k < 6; k++) eShot(z.x, z.y, z.spin + k / 6 * 6.283, 215, 'orb');
+        addRing(z.x, z.y, 620, 420, 24, '#ffd24a');
+        break;
+      case 'plague':
+        for (const q of players) if (q.alive && !q.gone)
+          for (let k = 0; k < 2; k++) addZone(q.x + rand(-130, 130), q.y + rand(-130, 130), 78, 1.1, 26, '#9fe08a',
+            h => puddles.push({ x: h.x, y: h.y, r: 46, life: 6 }));
+        break;
+      case 'frost':
+        for (const q of players) if (q.alive && !q.gone) q.slow = 3;
+        addRing(z.x, z.y, 800, 360, 26, '#b8e8ff', true);
+        break;
+      case 'gravelord':
+        if (room()) for (let k = 0; k < 4; k++) newZ.push(makeZombie('walker', z.x + rand(-90, 90), z.y + rand(-90, 90), true));
+        for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283 + .3, 340, 'bone');
+        break;
+      case 'devourer':
+        z.chargeT = 1.2; z.cdx = tdx; z.cdy = tdy;
+        addRing(z.x, z.y, 520, 380, Math.round(z.dmg * .6), '#e8734a');
+        break;
+      case 'warden':
+        for (let k = 0; k < 4; k++) addBeam(z, a + k * 1.571, 860, .6, .5, 1.4, 16, '#c0b0ff');
+        break;
+    }
+  }
   switch (z.key) {
     case 'brood':
       if (z.t1 <= 0) {
@@ -2106,15 +2412,9 @@ function update(dt) {
         particles.push({ x: p.x + rand(-90, 90), y: p.y + rand(-90, 90), vx: 0, vy: -30, life: .5, max: .5, size: 5, color: '#6fd1c6' });
     }
 
-    let mx = (inHeld(p.i, 'right') ? 1 : 0) - (inHeld(p.i, 'left') ? 1 : 0);
-    let my = (inHeld(p.i, 'down') ? 1 : 0) - (inHeld(p.i, 'up') ? 1 : 0);
-    if (mx || my) {
-      const l = Math.hypot(mx, my); mx /= l; my /= l;
-      p.dx = mx; p.dy = my; p.walk += dt * 12;
-    }
-    const spd = pSpeed(p);
-    p.x += mx * spd * dt; p.y += my * spd * dt;
-    solid(p);
+    const mx = (inHeld(p.i, 'right') ? 1 : 0) - (inHeld(p.i, 'left') ? 1 : 0);
+    const my = (inHeld(p.i, 'down') ? 1 : 0) - (inHeld(p.i, 'up') ? 1 : 0);
+    moveStep(p, mx, my, dt);
 
     if (inTap(p.i, 'swap')) switchNext(p);
     for (let k = 0; k < DROP_KEYS.length; k++) if (inTap(p.i, DROP_KEYS[k])) switchTo(p, k);
@@ -2184,7 +2484,7 @@ function update(dt) {
     if (!t) continue;
     const tdx = (t.x - z.x) / (bd || 1), tdy = (t.y - z.y) / (bd || 1);
     let [fx, fy] = flowDir(z, t);
-    let sp = z.speed;
+    let sp = z.speed * evSpeedZ();
     z.frozen = false;
     if (z.slow > 0) { z.slow -= dt; sp *= z.boss ? .75 : .5; }
 
@@ -2198,6 +2498,71 @@ function update(dt) {
       z.dcd -= dt;
       if (z.dashT > 0) { z.dashT -= dt; fx = z.ddx; fy = z.ddy; sp = 430; }
       else if (z.dcd <= 0 && bd < 280) { z.dashT = .4; z.dcd = rand(3, 4.5); z.ddx = tdx; z.ddy = tdy; burst(z.x, z.y, '#9fb3c2', 6, 100); }
+    }
+    // --- modifier behaviour ---
+    if (z.zmod === 'fetid') {
+      z.sludge -= dt;
+      if (z.sludge <= 0 && z.inside) { z.sludge = 1.5; puddles.push({ x: z.x, y: z.y, r: 28, life: 4 }); }
+    }
+    if (z.regen && z.hp < z.max) z.hp = Math.min(z.max, z.hp + z.regen * dt);
+    if (z.rally > 0) { z.rally -= dt; sp *= 1.35; }
+
+    // --- new movement patterns ---
+    if (z.leap) {
+      z.lcd = (z.lcd === undefined ? rand(.8, 2.2) : z.lcd) - dt;
+      if (z.leapT > 0) {
+        z.leapT -= dt; fx = z.ldx; fy = z.ldy; sp = 640;
+        z.air = Math.sin((1 - z.leapT / .45) * Math.PI) * 20;
+        if (z.leapT <= 0) {
+          z.air = 0; addShake(3);
+          burst(z.x, z.y, '#9fc46a', 10, 160, 5);
+          for (const q of players) if (q.alive && !q.gone && dist(q, z) < z.r + 34) hurt(q, z.dmg * 1.3);
+        }
+      } else if (z.lcd <= 0 && bd > 90 && bd < 560) {
+        z.leapT = .45; z.lcd = rand(3, 4.8); z.ldx = tdx; z.ldy = tdy;
+        burst(z.x, z.y, '#9fc46a', 6, 90);
+      }
+    }
+    if (z.charge) {
+      z.ccd = (z.ccd === undefined ? rand(1.2, 3) : z.ccd) - dt;
+      if (z.chT > 0) {
+        z.chT -= dt;
+        if (z.chT > .75) { sp = 0; z.windup = true; z.charging = false; }
+        else { z.windup = false; z.charging = true; fx = z.cdx; fy = z.cdy; sp = 540; }
+        if (z.chT <= 0) { z.charging = false; z.windup = false; }
+      } else if (z.ccd <= 0 && bd < 540) {
+        z.chT = 1.9; z.ccd = rand(5, 8); z.cdx = tdx; z.cdy = tdy;
+      }
+    }
+    if (z.strafe && bd < 400) {
+      const dir = (z.id % 2) ? 1 : -1;
+      fx = fx * .25 - tdy * dir * .95; fy = fy * .25 + tdx * dir * .95;
+    }
+    if (z.scream) {
+      z.scT = (z.scT === undefined ? rand(3, 6) : z.scT) - dt;
+      if (z.scT <= 0) {
+        z.scT = rand(8, 11);
+        addRing(z.x, z.y, 360, 430, 16, '#d07ab0');
+        let n = 0;
+        for (const o of zombies) if (o !== z && !o.dead && !o.boss && dist(o, z) < 340) { o.rally = 5; n++; }
+        if (n) floatText(z.x, z.y - z.r * 2.6, 'RALLY x' + n, '#d07ab0');
+      }
+    }
+    if (z.burrow) {
+      z.buT = (z.buT === undefined ? rand(1.5, 3.5) : z.buT) - dt;
+      if (z.under > 0) {
+        z.under -= dt; sp = 0; z.hidden = true;
+        if (z.under <= 0) {
+          z.hidden = false;
+          const tg = pick(players.filter(q => q.alive && !q.gone)) || t;
+          const ang = rand(0, 6.283);
+          const nx = clamp(tg.x + Math.cos(ang) * 74, 30, WW - 30), ny = clamp(tg.y + Math.sin(ang) * 74, 30, WH - 30);
+          if (!isBlockedAt(nx, ny)) { z.x = nx; z.y = ny; }
+          burst(z.x, z.y, '#8a6a45', 16, 190, 6); addShake(3);
+        }
+      } else if (z.buT <= 0 && bd > 90) {
+        z.under = 1.2; z.buT = rand(6, 9); burst(z.x, z.y, '#8a6a45', 12, 140);
+      }
     }
     if (z.elite) eliteFire(z, t, bd, dt);
     if (z.boss) {
@@ -2399,7 +2764,8 @@ function update(dt) {
   for (const l of loot) { if (l.cool > 0) l.cool -= dt; if (l.life !== undefined) l.life -= dt; }
   loot = loot.filter(l => l.life === undefined || l.life > 0);
 
-  // ---- airstrike + medkits ----
+  // ---- ultimates + medkits ----
+  if (ultPending > 0) { ultPending -= dt; if (ultPending <= 0) resolveUlt(); }
   for (const st of strikes) {
     st.t -= dt;
     if (st.t <= 0) { explode(st.x, st.y, 110, 170, st.owner, null); st.done = true; }
@@ -2427,6 +2793,7 @@ function update(dt) {
 
   // ---- match flow ----
   if (state === 'play') {
+    if (!PVP()) updateEvent(dt);          // world events are a co-op thing
     if (PVP()) {
       if (gameMode !== 'gg') {
         pvpDropT -= dt;
@@ -2435,7 +2802,7 @@ function update(dt) {
       checkPvpEnd();
     } else if (clearT > 0) {
       clearT -= dt;
-      if (clearT <= 0) openShop();
+      if (clearT <= 0) { endEvent(); openShop(); }
     } else if (intermission > 0) {
       intermission -= dt;
       if (intermission <= 0) nextWave();
@@ -2650,6 +3017,21 @@ function drawMinion(m) {
 }
 
 function drawZombie(z) {
+  if (z.hidden) {                                   // burrowed: only the mound shows
+    ctx.fillStyle = 'rgba(70,54,34,.85)';
+    ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r * 1.2, z.r * .5, 0, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#2a2016'; ctx.lineWidth = 2; ctx.stroke();
+    return;
+  }
+  if (z.zmod) {
+    const M = ZMODS[z.zmod];
+    ctx.fillStyle = M.tint + '2a';
+    ctx.beginPath(); ctx.arc(z.x, z.y - z.r * .4, z.r * 1.8, 0, 6.283); ctx.fill();
+  }
+  if (z.windup) {                                   // charger winding up
+    ctx.strokeStyle = `rgba(255,140,60,${.4 + .4 * Math.sin(time * 22)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(z.x, z.y); ctx.lineTo(z.x + (z.cdx || 0) * 220, z.y + (z.cdy || 0) * 220); ctx.stroke();
+  }
   if (z.elite) {
     ctx.fillStyle = `rgba(242,210,122,${.18 + .1 * Math.sin(time * 6)})`;
     ctx.beginPath(); ctx.arc(z.x, z.y - z.r * .4, z.r * 2.1, 0, 6.283); ctx.fill();
@@ -2667,7 +3049,9 @@ function drawZombie(z) {
     ctx.strokeStyle = 'rgba(255,120,60,.7)'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(z.x, z.y); ctx.lineTo(z.x + (z.cdx || 0) * 90, z.y + (z.cdy || 0) * 90); ctx.stroke();
   }
-  drawBlock(z.x, z.y, z.r, z.body, z.head, z.dx, z.dy, z.walk, z.flash > 0, true,
+  const air = z.air || 0;
+  if (air) { ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(z.x, z.y + 6, z.r, z.r * .4, 0, 0, 6.283); ctx.fill(); }
+  drawBlock(z.x, z.y - air, z.r, z.body, z.head, z.dx, z.dy, z.walk, z.flash > 0, true,
             z.necro ? '#e8fff2' : z.boss ? '#fff26b' : z.elite ? '#ffd24a' : '#ff3b2a');
   ctx.globalAlpha = 1;
   if (z.ward) {
@@ -2691,9 +3075,14 @@ function drawZombie(z) {
     ctx.fillStyle = '#f2d27a'; ctx.font = `bold 11px ${FONT}`; ctx.textAlign = 'center';
     ctx.fillText('ELITE ' + (ELITE_PATTERNS[z.ep] ? ELITE_PATTERNS[z.ep].name : ''), z.x, z.y - z.r * 2.4);
   }
-  if (z.mini) {
-    ctx.fillStyle = '#e2735f'; ctx.font = `bold 11px ${FONT}`; ctx.textAlign = 'center';
+  if (z.mini || (z.boss && z.savage)) {
+    ctx.fillStyle = z.savage ? '#ff5a3c' : '#e2735f'; ctx.font = `bold 11px ${FONT}`; ctx.textAlign = 'center';
     ctx.fillText(z.name, z.x, z.y - z.r * 2.4);
+  }
+  if (z.zmod) {
+    const M = ZMODS[z.zmod];
+    ctx.fillStyle = M.tint; ctx.font = `bold 10px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText(M.name.toUpperCase(), z.x, z.y - z.r * 2.45);
   }
   if ((!z.boss || z.mini) && z.hp < z.max) {
     ctx.fillStyle = '#000'; ctx.fillRect(z.x - z.r, z.y - z.r * 2.1, z.r * 2, 4);
@@ -2879,6 +3268,7 @@ function drawWorld() {
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (activeMods.has('fog') && state !== 'title') drawFog();
+  if (state !== 'title') drawEventOverlay();
 }
 
 const fogC = document.createElement('canvas'); fogC.width = W; fogC.height = H;
@@ -3149,16 +3539,18 @@ function drawHud() {
   if (PVP()) { drawScorePanel(me); drawEdgeMarkers(me); }
   else {
     drawChainBar(me); drawTeamPanel(me); drawEdgeMarkers(me);
-    const pw = 380, px = W / 2 - pw / 2, full = teamEnergy >= energyMax();
+    const pw = 470, px = W / 2 - pw / 2, full = teamEnergy >= energyMax();
     const modTxt = [...activeMods].map(m => MODIFIERS[m].name).join('  ·  ');
     const ph = modTxt ? 46 : 26;
     ctx.fillStyle = 'rgba(18,17,12,.85)'; ctx.fillRect(px, AY + 8, pw, ph);
     ctx.textAlign = 'left'; ctx.font = `bold 12px ${FONT}`;
     ctx.fillStyle = full ? (Math.floor(time * 4) % 2 ? '#ff9a3c' : '#ffd27a') : '#8f8870';
-    ctx.fillText(full ? 'Airstrike ready: two players press G together' : 'Airstrike', px + 10, AY + 25);
+    const rd = readyUlt();
+    ctx.fillText(full ? `${rd ? rd.name : 'Ultimate'}: ${rd ? rd.need : 2}+ on G together`
+                      : `Ultimate · ${rd ? rd.name : 'Airstrike'} at ${rd ? rd.need : 2}`, px + 10, AY + 25);
     if (!full) {
-      ctx.fillStyle = '#3a372c'; ctx.fillRect(px + 90, AY + 16, 270, 10);
-      ctx.fillStyle = '#ff9a3c'; ctx.fillRect(px + 90, AY + 16, 270 * teamEnergy / energyMax(), 10);
+      ctx.fillStyle = '#3a372c'; ctx.fillRect(px + 210, AY + 16, 250, 10);
+      ctx.fillStyle = '#ff9a3c'; ctx.fillRect(px + 210, AY + 16, 250 * teamEnergy / energyMax(), 10);
     }
     if (modTxt) {
       ctx.textAlign = 'center'; ctx.font = `bold 12px ${FONT}`; ctx.fillStyle = '#c9a0ff';
@@ -3614,6 +4006,7 @@ function onHostData(gst, d) {
   gst.seen = performance.now();
   if (!d || typeof d !== 'object') return;
   if (d.t === 'ping') { sendTo(gst.conn, { t: 'pong', k: d.k }); return; }
+  if (typeof d.seq === 'number') gst.ack = d.seq;
   if (d.t === 'held' && d.h) {
     const h = netHeld[gst.idx] = {};
     for (const a of ACTIONS) h[a] = !!d.h[a];
@@ -3757,6 +4150,7 @@ function snapshot() {
   const out = {
     t: 'snap', st: state, gm: gameMode, wave, ts: toSpawn + miniQueue, cl: f2(clearT), it: f2(intermission),
     te: teamEnergy, am: [...activeMods], nm: nextMods, sh: f2(shake), best, tsc: teamScore, pe: pvpEnd,
+    we: wEvent ? [EVENT_KEYS.indexOf(wEvent), f2(wEventT)] : 0, up: ultPending > 0 ? 1 : 0,
     ma: Object.keys(mastery).map(k => mastery[k].lv),
     pl: players.map(p => ({
       x: r(p.x), y: r(p.y), a: r(Math.atan2(p.dy, p.dx) * 40), hp: r(p.hp), mh: maxHp(p),
@@ -3769,7 +4163,8 @@ function snapshot() {
     z: zombies.map(z => [z.id, z.boss ? 100 + BKEYS.indexOf(z.key) : ZKEYS.indexOf(z.type), r(z.x), r(z.y),
       r(Math.max(0, z.hp / z.max) * 100), r(Math.atan2(z.dy, z.dx) * 40), r((z.walk % 6.283) * 10),
       (z.elite ? 1 : 0) | (z.slow > 0 ? 2 : 0) | (z.burn > 0 ? 4 : 0) | (z.charging ? 8 : 0) | (z.ward ? 16 : 0)
-      | (z.mini ? 32 : 0) | (z.flash > 0 ? 64 : 0),
+      | (z.mini ? 32 : 0) | (z.flash > 0 ? 64 : 0) | ((z.zmod ? ZMOD_KEYS.indexOf(z.zmod) + 1 : 0) << 7)
+      | (z.savage ? 512 : 0) | (z.hidden ? 1024 : 0) | (z.windup ? 2048 : 0) | (z.air ? 4096 : 0),
       z.blinkT > 0 ? [r(z.bx), r(z.by)] : 0, z.ep ? EPKEYS.indexOf(z.ep) : -1]),
     mi: minions.map(m => [m.id, m.kind === 'drone' ? 0 : 1, r(m.x), r(m.y), f2(m.hp / m.max), f2(m.dx), f2(m.dy),
       f2(m.walk % 6.283), m.flash > 0 ? 1 : 0]),
@@ -3863,11 +4258,17 @@ function applySnap(S) {
   if (!mastery.m1911) for (const id in W_DEFS) mastery[id] = { lv: 0 };
   if (myIndex < 0 && typeof S.you === 'number') myIndex = S.you;
   if (myIndex < 0) return;
+  // interval measured in simulated time, so a stutter in the render loop cannot
+  // corrupt how fast we interpolate
+  if (lastSnapSim) snapDt = clamp(snapDt * .7 + (simClock - lastSnapSim) * .3, .04, .3);
+  lastSnapSim = simClock;
+  if (typeof S.ack === 'number') lastAck = S.ack;
   if (S.gm && S.gm !== gameMode) { gameMode = S.gm; setupMap(); resetGround(); }
   const pal = S.pal || [];
   state = S.st; wave = S.wave; toSpawn = S.ts; clearT = S.cl; intermission = S.it; teamEnergy = S.te;
   activeMods = new Set(S.am); nextMods = S.nm; shake = Math.min(SHAKE_MAX, S.sh); best = Math.max(best, S.best || 0);
   teamScore = S.tsc || [0, 0]; pvpEnd = S.pe || '';
+  if (S.we) { wEvent = EVENT_KEYS[S.we[0]]; wEventT = S.we[1]; } else { wEvent = null; wEventT = 0; }
   Object.keys(mastery).forEach((k, i) => { mastery[k].lv = S.ma[i] || 0; });
 
   while (players.length < S.pl.length) {
@@ -3899,9 +4300,10 @@ function applySnap(S) {
     const alive = !!(q.f & 1);
     const revived = !p.alive && alive;
     p.alive = alive;
-    p.tx = q.x; p.ty = q.y;
+    p.fx = p.x; p.fy = p.y; p.tx = q.x; p.ty = q.y; p.it = 0;
     const far = Math.hypot(q.x - p.x, q.y - p.y) > 150;
-    if (p.fresh || far || revived || (self && (!p.alive || state !== 'play'))) { p.x = q.x; p.y = q.y; p.fresh = false; }
+    if (self && p.alive && state === 'play' && !p.fresh && !revived) reconcile(p, q.x, q.y);
+    else if (p.fresh || far || revived || (self && (!p.alive || state !== 'play'))) { p.x = q.x; p.y = q.y; p.fresh = false; }
     if (!self) { const pa = q.a / 40; p.dx = Math.cos(pa); p.dy = Math.sin(pa); p.walk = q.w / 10; }
   });
   if (!players[myIndex]) return;
@@ -3915,16 +4317,25 @@ function applySnap(S) {
       const bossKey = ti >= 100 ? BKEYS[ti - 100] : null;
       const boss = bossKey ? BOSS_BY_KEY[bossKey] : null;
       const T = boss || ZT[ZKEYS[ti]] || ZT.walker;
-      z0r = boss ? Math.round(boss.r * ((flags & 32) ? MINI_R : 1)) : Math.round(T.r * ((flags & 1) ? 1.3 : 1));
-      z = { id, type: boss ? 'boss' : ZKEYS[ti], boss: !!boss, key: bossKey || undefined,
-            name: boss ? ((flags & 32) ? 'Lesser ' + boss.name.replace(/^The /, '') : boss.name) : '',
-            body: T.body, head: T.head, shield: !!T.shield, bloat: !!T.bloat, necro: !!T.necro,
+      const zmk = (flags >> 7) & 3, zmm = zmk ? ZMODS[ZMOD_KEYS[zmk - 1]] : null;
+      z0r = boss ? Math.round(boss.r * ((flags & 32) ? MINI_R : 1) * ((flags & 512) ? 1.12 : 1))
+                 : Math.round(T.r * ((flags & 1) ? 1.3 : 1) * (zmm ? zmm.r : 1));
+      const sav = !!(flags & 512);
+      let bd0 = T.body, hd0 = T.head;
+      if (zmm) { bd0 = mixHex(bd0, zmm.tint, .38); hd0 = mixHex(hd0, zmm.tint, .5); }
+      if (boss && sav) { bd0 = mixHex(T.body, '#a8161f', .45); hd0 = mixHex(T.head, '#ff5a3c', .4); }
+      z = { id, type: boss ? 'boss' : ZKEYS[ti], boss: !!boss, key: bossKey || undefined, savage: sav,
+            zmod: zmk ? ZMOD_KEYS[zmk - 1] : undefined,
+            name: (sav ? 'Savage ' : '') + (boss ? ((flags & 32) ? 'Lesser ' + boss.name.replace(/^The /, '') : boss.name) : ''),
+            body: bd0, head: hd0, shield: !!T.shield, bloat: !!T.bloat, necro: !!T.necro,
             x, y, wob: id % 7 };
     }
     if (z0r) z.r = z0r;
+    z.fx = z.x; z.fy = z.y; z.it = 0;
     Object.assign(z, { tx: x, ty: y, hp: hpk, max: 1, dx, dy, walk, flash: (flags & 64) ? 1 : 0,
       elite: !!(flags & 1), slow: flags & 2 ? 1 : 0, burn: flags & 4 ? 1 : 0,
       charging: !!(flags & 8), ward: !!(flags & 16), mini: !!(flags & 32),
+      hidden: !!(flags & 1024), windup: !!(flags & 2048), air: (flags & 4096) ? 14 : 0,
       ep: ep >= 0 ? EPKEYS[ep] : undefined, cdx: dx, cdy: dy,
       blinkT: blink ? 1 : 0, bx: blink ? blink[0] : 0, by: blink ? blink[1] : 0 });
     return z;
@@ -3940,6 +4351,7 @@ function applySnap(S) {
     const [id, kind, x, y, hpk, dx, dy, walk, flash] = a;
     let m = oldM.get(id);
     if (!m) m = { id, kind: kind ? 'undead' : 'drone', x, y, r: kind ? 12 : 9, max: 1 };
+    m.fx = m.x; m.fy = m.y; m.it = 0;
     Object.assign(m, { tx: x, ty: y, hp: hpk, max: 1, dx, dy, walk, flash: flash ? 1 : 0 });
     return m;
   });
@@ -3998,36 +4410,73 @@ function guestSendInput() {
   const h = {};
   for (const a of ACTIONS) h[a] = held(CTRL[a]);
   const key = JSON.stringify(h);
-  if (key !== lastHeldSent) { send({ t: 'held', h }); lastHeldSent = key; }
+  if (key !== lastHeldSent) { send({ t: 'held', h, seq: inSeq }); lastHeldSent = key; }
   for (const a of ACTIONS) if (tap(CTRL[a])) send({ t: 'tap', a });
   if (tap(['KeyP', 'Escape'])) send({ t: 'tap', a: 'pause' });
   if (tap(['KeyR'])) send({ t: 'tap', a: 'restart' });
 }
+// Replay the inputs the host has not shown us yet on top of its last word, then
+// ease our predicted position onto the result. The rewind is measured in
+// simulated time from our own frame history, never the wall clock, so a slow or
+// fast frame cannot make us replay the wrong amount of movement.
+function reconcile(me, ax, ay) {
+  const lag = clamp(myPing / 2000 + snapDt * .5, .02, .35);
+  let acc = 0, start = inHist.length;
+  while (start > 0 && acc < lag) { start--; acc += inHist[start].dt; }
+  const sim = { x: ax, y: ay, r: me.r, dx: me.dx, dy: me.dy, walk: 0, inside: true,
+                cls: me.cls, up: me.up, buffSpeed: me.buffSpeed, slow: me.slow };
+  for (let i = start; i < inHist.length; i++) moveStep(sim, inHist[i].mx, inHist[i].my, inHist[i].dt);
+  const ex = sim.x - me.x, ey = sim.y - me.y, e = Math.hypot(ex, ey);
+  if (e > 150) { me.x = sim.x; me.y = sim.y; }          // respawn, teleport or a bad desync
+  else if (e > 2) { me.x += ex * .35; me.y += ey * .35; }
+}
+// Local muzzle flash so your own shots feel instant; the host still decides
+// what they hit.
+function predictShot(me, dt) {
+  me.cd -= dt;
+  const s = me.slots[me.cur];
+  if (!s || s.ammo <= 0 || me.cd > 0 || !held(CTRL.fire)) return;
+  const st = stats(s, me);
+  me.cd = st.rate;
+  const a = Math.atan2(me.dy, me.dx);
+  const ox = me.x + me.dx * 18, oy = me.y - 4 + me.dy * 18;
+  particles.push({ x: ox + me.dx * 6, y: oy + me.dy * 6, vx: 0, vy: 0, life: .05, max: .05, size: 9, color: s.def.color, local: 1 });
+  if (s.def.kind === 'bullet' || s.def.kind === 'laser') {
+    const len = s.def.kind === 'laser' ? (st.range || 600) : 130;
+    beams.push({ x1: ox, y1: oy, x2: ox + Math.cos(a) * len, y2: oy + Math.sin(a) * len,
+                 w: s.def.kind === 'laser' ? (s.def.width || 3) : 1.6, color: s.def.color, life: .05, max: .05, local: 1 });
+  }
+}
 function guestFrame(dt) {
   time += dt;
+  simClock += dt;
   const me = players[myIndex];
   if (state === 'play' && me && me.alive) {
-    let mx = (held(CTRL.right) ? 1 : 0) - (held(CTRL.left) ? 1 : 0);
-    let my = (held(CTRL.down) ? 1 : 0) - (held(CTRL.up) ? 1 : 0);
-    const moving = !!(mx || my);
-    if (moving) {
-      const l = Math.hypot(mx, my); mx /= l; my /= l;
-      me.dx = mx; me.dy = my; me.walk += dt * 12;
-      const spd = pSpeed(me);
-      me.x += mx * spd * dt; me.y += my * spd * dt;
-      solid(me);
-    }
-    const ex = (me.tx ?? me.x) - me.x, ey = (me.ty ?? me.y) - me.y, e = Math.hypot(ex, ey);
-    const k = moving ? (e > 40 ? Math.min(1, dt * 3) : 0) : Math.min(1, dt * 8);
-    me.x += ex * k; me.y += ey * k;
+    const mx = (held(CTRL.right) ? 1 : 0) - (held(CTRL.left) ? 1 : 0);
+    const my = (held(CTRL.down) ? 1 : 0) - (held(CTRL.up) ? 1 : 0);
+    inSeq++;
+    inHist.push({ seq: inSeq, mx, my, dt });
+    if (inHist.length > 150) inHist.splice(0, inHist.length - 150);
+    moveStep(me, mx, my, dt);                          // predict immediately
+    predictShot(me, dt);
   }
-  const smooth = Math.min(1, dt * 15);
+  // Remote things walk a straight line from where they were drawn to the newest
+  // authoritative position, arriving exactly as the next snapshot lands. Motion
+  // is as smooth as the host's, one interval behind.
+  const lerpTo = e => {
+    if (e.tx === undefined) return;
+    if (e.fx === undefined) { e.fx = e.x; e.fy = e.y; e.it = 0; }
+    e.it = (e.it || 0) + dt;
+    const k = Math.min(1, e.it / snapDt);
+    e.x = e.fx + (e.tx - e.fx) * k;
+    e.y = e.fy + (e.ty - e.fy) * k;
+  };
   for (const p of players) {
     if (p.gone || (p === me && p.alive && state === 'play')) continue;
-    if (p.tx !== undefined) { p.x += (p.tx - p.x) * smooth; p.y += (p.ty - p.y) * smooth; }
+    lerpTo(p);
   }
-  for (const z of zombies) { z.x += (z.tx - z.x) * smooth; z.y += (z.ty - z.y) * smooth; }
-  for (const m of minions) { m.x += (m.tx - m.x) * smooth; m.y += (m.ty - m.y) * smooth; }
+  for (const z of zombies) lerpTo(z);
+  for (const m of minions) lerpTo(m);
   for (const b of bullets) {
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.kind !== 'homing') {
@@ -4187,7 +4636,7 @@ function frame(now) {
         if (!base) base = snapshot();
         const pl = players[gst.idx];
         const view = pl ? cullFor(base, pl.x, pl.y, gst.q) : Object.assign({}, base);
-        Object.assign(view, eventsFor(gst), { you: gst.idx, me: pl ? detailFor(pl) : null });
+        Object.assign(view, eventsFor(gst), { you: gst.idx, ack: gst.ack || 0, me: pl ? detailFor(pl) : null });
         sendTo(gst.conn, view);
       }
     }
