@@ -134,6 +134,13 @@ const LEGENDARY = {
   reaper:      { name:'The Reaper',      cat:'Legendary', kind:'bullet', rate:.06, dmg:30, speed:1000, spread:.05, pierce:3, ammo:700, color:'#ff7a9c' }
 };
 const ALL_W = id => LEGENDARY[id] || W_DEFS[id];
+const BCOLORS = (() => {
+  const set = [];
+  for (const d of Object.values(W_DEFS).concat(Object.values(LEGENDARY))) if (!set.includes(d.color)) set.push(d.color);
+  for (const c of ['#9ad7ff', '#ffe28a', '#e6dfc8']) if (!set.includes(c)) set.push(c);
+  return set;
+})();
+const bcol = c => { const i = BCOLORS.indexOf(c); return i < 0 ? 0 : i; };
 const RARITY_COLOR = { base:'#e6dfc8', rare:'#5aa9ff', legendary:'#ff9f1a' };
 const SLOT_CAP = 3;              // weapons a player may carry
 const DROP_KEYS = ['slot1', 'slot2', 'slot3'];
@@ -152,17 +159,18 @@ const SHARE_CHAIN = true;
 /* ---------------- CONFIG: weapon mods (stackable) ---------------- */
 // Mods stack: pick up the same mod twice and the effect applies twice.
 const MODS = {
-  overclock:  { name:'Overclock',  desc:'+22% damage and 16% faster fire (stacks)',      color:'#c6ff5a' },
-  ricochet:   { name:'Ricochet',   desc:'+2 wall bounces, Tesla +3 chains (stacks)',     color:'#e6dfc8' },
-  cryo:       { name:'Cryo',       desc:'Hits chill enemies for 2s (stacks longer)',     color:'#8fd8ff' },
-  leech:      { name:'Leech',      desc:'Heal for 3% of damage dealt (stacks)',          color:'#ff6b8a' },
-  boom:       { name:'Volatile',   desc:'Kills detonate, +35% blast size (stacks)',      color:'#ffb347' },
-  scope:      { name:'Scope',      desc:'+1 pierce, +20% range and shot speed (stacks)', color:'#b8c8ff' },
-  magazine:   { name:'Extended mag', desc:'+50% ammo capacity (stacks)',                 color:'#d8c48a' },
-  incendiary: { name:'Incendiary', desc:'Shots set enemies on fire (stacks)',            color:'#ff7a2f' },
-  hollow:     { name:'Hollow point', desc:'+12% critical chance (stacks)',               color:'#ffd27a' }
+  overclock:  { name:'Overclock',  desc:'+22% damage and 16% faster fire',      color:'#c6ff5a' },
+  ricochet:   { name:'Ricochet',   desc:'+2 wall bounces, Tesla +3 chains',     color:'#e6dfc8' },
+  cryo:       { name:'Cryo',       desc:'Hits chill enemies for 2s',     color:'#8fd8ff' },
+  leech:      { name:'Leech',      desc:'Heal for 3% of damage dealt',          color:'#ff6b8a' },
+  boom:       { name:'Volatile',   desc:'Kills detonate, +35% blast size',      color:'#ffb347' },
+  scope:      { name:'Scope',      desc:'+1 pierce, +20% range and shot speed', color:'#b8c8ff' },
+  magazine:   { name:'Extended mag', desc:'+50% ammo capacity',                 color:'#d8c48a' },
+  incendiary: { name:'Incendiary', desc:'Shots set enemies on fire',            color:'#ff7a2f' },
+  hollow:     { name:'Hollow point', desc:'+12% critical chance',               color:'#ffd27a' }
 };
-const MOD_STACK_MAX = 5;
+const MOD_STACK_MAX = 3;   // how deep one mod can stack on a weapon
+const MOD_SLOTS = 6;       // how many mods total a weapon can carry
 const ELITE_FROM = 3;
 
 /* ---------------- CONFIG: player classes ---------------- */
@@ -266,15 +274,24 @@ const ZT = {
 };
 // Elites are rarer, much tougher, and fire dense bullet-hell patterns.
 // They fire faster the more players are in the game.
+// type: shots (default) | twin | beam | zones | ring | burst
+// The newer patterns lean on hazards instead of bullets: they read clearly,
+// they threaten ground rather than filling the air, and they cost the network
+// one entity instead of thirty.
 const ELITE_PATTERNS = {
-  spiral: { name:'Spiral',  every:.38, shots:2,  speed:210, kind:'fire', desc:'slow spinning stream' },
-  ring:   { name:'Nova',    every:1.9, shots:10, speed:200, kind:'orb',  desc:'heavy rings of orbs' },
-  fan:    { name:'Scatter', every:.90, shots:5,  speed:250, kind:'acid', arc:1.1, aim:true, desc:'wide aimed fans' },
-  cross:  { name:'Lattice', every:1.05, shots:6, speed:190, kind:'ice',  desc:'rotating lattice of ice' },
-  hunter: { name:'Hunter',  every:.62, shots:3,  speed:300, kind:'bone', arc:.34, aim:true, desc:'heavy aimed volleys' }
+  spiral: { name:'Spiral',  every:.55, shots:2,  speed:210, kind:'fire', desc:'slow spinning stream' },
+  ring:   { name:'Nova',    every:2.4, shots:7,  speed:200, kind:'orb',  desc:'heavy rings of orbs' },
+  fan:    { name:'Scatter', every:1.2, shots:5,  speed:250, kind:'acid', arc:1.1, aim:true, desc:'wide aimed fans' },
+  cross:  { name:'Lattice', every:1.5, shots:6,  speed:190, kind:'ice',  desc:'rotating lattice of ice' },
+  hunter: { name:'Hunter',  every:.85, shots:3,  speed:300, kind:'bone', arc:.34, aim:true, desc:'heavy aimed volleys' },
+  twin:   { name:'Twin',    every:.52, shots:2,  speed:230, kind:'void', type:'twin', desc:'counter-spinning arms' },
+  lance:  { name:'Lance',   every:3.4, type:'beam',  desc:'a beam that sweeps the floor' },
+  seeder: { name:'Seeder',  every:2.8, type:'zones', desc:'ground that erupts under you' },
+  quake:  { name:'Quake',   every:3.6, type:'ring',  desc:'rolling shockwaves' },
+  bomber: { name:'Bomber',  every:3.0, shots:8, speed:215, kind:'fire', type:'burst', desc:'charges up, then bursts' }
 };
 const ELITE_RATE_PER_PLAYER = .12;   // each extra player makes elites this much faster
-const ESHOT_CAP = 300;
+const ESHOT_CAP = 220;
 
 /* ---------------- CONFIG: bosses ---------------- */
 const BOSS_EVERY = 5;
@@ -394,7 +411,12 @@ let guests = [], roster = [], roomCode = '';
 let gameMode = 'coop';
 let myClass = 'soldier';
 let netHeld = {}, netTaps = {};
-let kickOpen = false, lastPing = 0;
+let kickOpen = false, lastPing = 0, myPing = 0, pingSeq = 0, lastSnapAt = 0;
+// Projectiles are replicated as spawn events plus early deaths; guests fly them
+// locally. A straight line needs one packet, not one per tick for its whole life.
+let evTick = 0;
+const evLog = [];                 // last few ticks of events, so a skipped send heals
+const EV_KEEP = 45;               // frames of event history kept for stragglers
 const banned = new Set();
 const PEER_TIMEOUT = 12000;      // no word from a guest for this long = they are gone
 const decalQueue = [];
@@ -510,7 +532,7 @@ function resetGround() {
   }
 }
 function splat(x, y, size, color) {
-  if (mode === 'host' && guests.length && decalQueue.length < 200) decalQueue.push([0, Math.round(x), Math.round(y), size, color]);
+  if (mode === 'host' && guests.length && decalQueue.length < 40) decalQueue.push([0, Math.round(x), Math.round(y), size, color]);
   g.fillStyle = color;
   for (let i = 0; i < 7; i++) {
     const s = rand(size * 0.2, size * 0.6);
@@ -611,14 +633,29 @@ function recalcSlots(p) {
 }
 const modCount = (s, id) => (s && s.mods && s.mods[id]) || 0;
 function modList(s) { return Object.keys(s.mods || {}).filter(k => s.mods[k] > 0); }
+function modTotal(s) { let n = 0; for (const k in (s && s.mods) || {}) n += s.mods[k]; return n; }
 function modLabel(s) {
   return modList(s).map(k => MODS[k].name + (s.mods[k] > 1 ? ' x' + s.mods[k] : '')).join(', ');
 }
-function addMod(s, id) {
+function canTakeMod(s, id) {
+  if (!s) return false;
   s.mods = s.mods || {};
-  if ((s.mods[id] || 0) >= MOD_STACK_MAX) return false;
+  return (s.mods[id] || 0) < MOD_STACK_MAX && modTotal(s) < MOD_SLOTS;
+}
+function addMod(s, id) {
+  if (!canTakeMod(s, id)) return false;
   s.mods[id] = (s.mods[id] || 0) + 1;
   return true;
+}
+// A weapon should end up wearing several different mods, not five of one. The
+// held weapon gets first refusal, but a mod it already has goes to a weapon
+// that does not, and a full weapon passes it along instead of refusing it.
+function modTarget(p, id) {
+  const cur = p.slots[p.cur];
+  const order = [cur].concat(p.slots.filter(s => s !== cur));
+  return order.find(s => canTakeMod(s, id) && !modCount(s, id))
+      || order.find(s => canTakeMod(s, id))
+      || null;
 }
 
 function stats(s, p) {
@@ -650,6 +687,15 @@ function rollWeaponId(maxTier) {
   const cap = maxTier || weaponTierCap();
   const pool = Object.keys(W_DEFS).filter(k => W_DEFS[k].tier <= cap && k !== 'm1911' && k !== 'knife');
   return pick(pool.length ? pool : ['mp5']);
+}
+
+function spawnBullet(o) {
+  o.id = pId++;
+  bullets.push(o);
+  // homing rounds curve, so those stay position-synced; everything else flies
+  // itself on the guest from this one event
+  if (mode === 'host' && guests.length && o.kind !== 'homing') evNewBullet(o);
+  return o;
 }
 
 function banner(text, color = '#e6dfc8', big = false) { banners.push({ text, color, big, life: big ? 3 : 2.4 }); }
@@ -688,13 +734,13 @@ function startGame() {
   }
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = []; minions = []; feed = []; corpses = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
-  bossPending = false; clearT = 0; activeMods = new Set(); nextMods = [];
+  bossPending = false; clearT = 0; activeMods = new Set(); nextMods = []; hazards = [];
   teamEnergy = 0; strikes = []; meds = []; miniQueue = 0; toSpawn = 0;
   resetGround();
   for (const p of players) giveStartWeapons(p);
   if (PVP()) startPvp(); else nextWave();
   updateCam(0, true);
-  if (mode === 'host') { send({ t: 'start', gm: gameMode }); snapAcc = 1; lobbyText(); }
+  if (mode === 'host') { send({ t: 'start', gm: gameMode, bo: bossOrder }); snapAcc = 1; lobbyText(); }
 }
 
 function giveStartWeapons(p) {
@@ -849,7 +895,7 @@ function farGate() {
   const far = GATES.filter(gt => players.every(p => p.gone || dist(p, gt) > 650));
   return pick(far.length ? far : GATES);
 }
-let nextId = 1;
+let nextId = 1, pId = 1;
 function makeZombie(type, x, y, inside) {
   const T = ZT[type];
   const scale = (1 + (wave - 1) * .09) * (activeMods.has('armored') ? 1.5 : 1) * (activeMods.has('swarm') ? .7 : 1);
@@ -898,7 +944,7 @@ function makeBoss(key, x, y, mini) {
     x, y, r: mini ? Math.round(B.r * MINI_R) : B.r, hp, max: hp,
     speed: B.speed * (mini ? 1.1 : 1), dmg: Math.round(B.dmg * (mini ? .7 : 1)), mass: B.mass * (mini ? .5 : 1),
     body: B.body, head: B.head, pts: mini ? 300 : 1000,
-    atk: 0, t1: 3, t2: 2, t3: 4, blinkT: 0, chargeT: 0, phase: 0,
+    atk: 0, t1: 3, t2: 2, t3: 4, t4: 6, blinkT: 0, chargeT: 0, phase: 0,
     inside: false, wob: 0, flash: 0, dx: 0, dy: 1, walk: 0, burn: 0, burnDps: 0
   };
   zombies.push(z);
@@ -1045,7 +1091,7 @@ function shoot(p, s, st, x, y, a) {
   if (d.kind === 'flame') {
     for (let k = 0; k < 2; k++) {
       const aa = a + rand(-d.spread, d.spread), sp = (st.speed || d.speed) * rand(.75, 1);
-      bullets.push({ kind: 'flame', x, y, vx: Math.cos(aa) * sp, vy: Math.sin(aa) * sp, dmg: st.dmg,
+      spawnBullet({ kind: 'flame', x, y, vx: Math.cos(aa) * sp, vy: Math.sin(aa) * sp, dmg: st.dmg,
         owner: p, slot: s, life: .42, pierce: 99, hit: new Set(), size: 5, color: d.color,
         burn: (st.burn || d.burn) * st.mult, crit: st.crit, bounces: 0 });
     }
@@ -1056,7 +1102,7 @@ function shoot(p, s, st, x, y, a) {
     const aa = (n > 1 && d.kind !== 'bullet') ? a + (k - (n - 1) / 2) * d.spread
                                               : a + rand(-(d.spread || 0), d.spread || 0);
     const sp = (st.speed || d.speed) * (d.kind === 'bullet' ? rand(.92, 1) : 1);
-    bullets.push({
+    spawnBullet({
       kind: d.kind, x, y, vx: Math.cos(aa) * sp, vy: Math.sin(aa) * sp, dmg: st.dmg, owner: p, slot: s,
       life: d.kind === 'bullet' ? (d.life || .9) : 2.5,
       blast: (d.blast || 0) * st.blastMul, blastDmg: (d.blastDmg || 0) * st.mult,
@@ -1416,7 +1462,7 @@ function explode(x, y, rad, dmg, owner, slot, hurtPlayers = 0, tint) {
   }
   g.fillStyle = 'rgba(0,0,0,.3)';
   g.beginPath(); g.arc(x, y, rad * .45, 0, 6.283); g.fill();
-  if (mode === 'host' && guests.length && decalQueue.length < 200) decalQueue.push([1, Math.round(x), Math.round(y), rad]);
+  if (mode === 'host' && guests.length && decalQueue.length < 40) decalQueue.push([1, Math.round(x), Math.round(y), rad]);
   for (const e of hostileList(owner)) {
     const d = Math.hypot(e.x - x, e.y - y);
     if (d < rad + e.r) damageAny(e, dmg * (1 - .5 * Math.min(1, d / rad)), owner, slot, e.x - x, e.y - y, true);
@@ -1443,7 +1489,15 @@ function rollLegendary() {
   const free = Object.keys(LEGENDARY).filter(k => !taken.has(k));
   return { kind: 'weapon', id: pick(free.length ? free : Object.keys(LEGENDARY)), rarity: 'legendary' };
 }
-function rollMod() { return { kind: 'mod', id: pick(Object.keys(MODS)) }; }
+function rollMod() {
+  // weight toward mods the squad has least of, so runs collect variety
+  const ids = Object.keys(MODS), have = {};
+  for (const q of players) for (const s of q.slots || []) for (const k in s.mods || {}) have[k] = (have[k] || 0) + s.mods[k];
+  const w = ids.map(id => 1 / (1 + (have[id] || 0)));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < ids.length; i++) { r -= w[i]; if (r <= 0) return { kind: 'mod', id: ids[i] }; }
+  return { kind: 'mod', id: pick(ids) };
+}
 function bossDeath(z, owner) {
   addShake(z.mini ? 8 : 16);
   if (z.mini) {
@@ -1470,6 +1524,110 @@ function gameOver() {
   if (!PVP() && wave > best) { best = wave; try { localStorage.setItem('blockrot-best', best); } catch (e) {} }
 }
 
+/* ---------------- hazards: telegraphed ground, shockwaves, beams ---------------- */
+// One hazard replaces a whole volley of bullets. They are readable, they are
+// dodgeable, and each one is a single entity on the wire.
+let hazards = [];
+const HAZ_CAP = 46;
+function addZone(x, y, r, warn, dmg, color, pop) {
+  if (hazards.length >= HAZ_CAP) return null;
+  const [fx, fy] = [clamp(x, 20, WW - 20), clamp(y, 20, WH - 20)];
+  const h = { id: nextId++, kind: 'zone', x: fx, y: fy, r, t: warn, warn, dmg, color: color || '#ff9a3c', pop };
+  hazards.push(h);
+  return h;
+}
+function addRing(x, y, max, speed, dmg, color, slow) {
+  if (hazards.length >= HAZ_CAP) return null;
+  const h = { id: nextId++, kind: 'ring', x, y, r: 24, max, speed, dmg, slow: !!slow,
+              color: color || '#e6dfc8', hit: new Set() };
+  hazards.push(h);
+  return h;
+}
+function addBeam(src, a, len, spin, warn, dur, dmg, color) {
+  if (hazards.length >= HAZ_CAP) return null;
+  const h = { id: nextId++, kind: 'beam', src, x: src.x, y: src.y, a, len, spin,
+              t: warn + dur, warn, dur, dmg, color: color || '#ff4d6d', cd: 0 };
+  hazards.push(h);
+  return h;
+}
+function updateHazards(dt) {
+  for (const h of hazards) {
+    if (h.kind === 'zone') {
+      h.t -= dt;
+      if (h.t > 0) continue;
+      h.dead = true;
+      burst(h.x, h.y, h.color, 16, 220, 6);
+      addShake(4);
+      for (const p of players) {
+        if (!p.alive || p.gone || dist(p, h) > h.r) continue;
+        damagePlayer(p, h.dmg, null, .2);
+        if (h.chill) p.slow = Math.max(p.slow, 1.8);
+      }
+      if (h.pop) h.pop(h);
+    } else if (h.kind === 'ring') {
+      h.r += h.speed * dt;
+      if (h.r > h.max) { h.dead = true; continue; }
+      for (const p of players) {
+        if (!p.alive || p.gone || h.hit.has(p.i)) continue;
+        const d = dist(p, h);
+        if (d > h.r - 28 && d < h.r + 28) {
+          h.hit.add(p.i);
+          damagePlayer(p, h.dmg, null, .2);
+          if (h.slow) p.slow = Math.max(p.slow, 1.6);
+        }
+      }
+    } else {
+      if (h.src && !h.src.dead) { h.x = h.src.x; h.y = h.src.y; }
+      h.a += h.spin * dt;
+      h.t -= dt;
+      if (h.t <= 0) { h.dead = true; continue; }
+      if (h.t > h.dur) continue;                       // still telegraphing
+      h.cd -= dt;
+      if (h.cd > 0) continue;
+      h.cd = .28;
+      const dx = Math.cos(h.a), dy = Math.sin(h.a);
+      for (const p of players) {
+        if (!p.alive || p.gone) continue;
+        const ox = p.x - h.x, oy = p.y - h.y, t = ox * dx + oy * dy;
+        if (t > 0 && t < h.len && Math.abs(ox * dy - oy * dx) < 24) damagePlayer(p, h.dmg, null, .2);
+      }
+    }
+  }
+  hazards = hazards.filter(h => !h.dead);
+}
+function drawHazards() {
+  for (const h of hazards) {
+    if (h.kind === 'zone') {
+      const k = clamp(1 - h.t / h.warn, 0, 1);
+      ctx.fillStyle = h.color + '22';
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.283); ctx.fill();
+      ctx.fillStyle = h.color + '55';
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r * k, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = h.color; ctx.lineWidth = 2 + 2 * k;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.283); ctx.stroke();
+    } else if (h.kind === 'ring') {
+      const fade = clamp(1 - h.r / h.max, 0, 1);
+      ctx.globalAlpha = .35 + .5 * fade;
+      ctx.strokeStyle = h.color; ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.283); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      const live = h.t <= h.dur;
+      const ex = h.x + Math.cos(h.a) * h.len, ey = h.y + Math.sin(h.a) * h.len;
+      ctx.globalAlpha = live ? 1 : .45 + .25 * Math.sin(time * 26);
+      ctx.strokeStyle = h.color; ctx.lineWidth = live ? 22 : 3;
+      ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      if (live) {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
 /* ---------------- enemy projectiles ---------------- */
 const ESHOT = { fire:[6,21,'#ff7a2f'], acid:[7,15,'#b6e04a'], orb:[8,23,'#9ad7ff'],
                 ice:[6,16,'#bfe9ff'], bone:[5,28,'#efe7d2'], void:[9,30,'#c77ddb'] };
@@ -1477,8 +1635,10 @@ const ESHOT = { fire:[6,21,'#ff7a2f'], acid:[7,15,'#b6e04a'], orb:[8,23,'#9ad7ff
 function eShot(x, y, a, speed, kind, mul) {
   if (eshots.length >= ESHOT_CAP) return;
   const spec = ESHOT[kind] || ESHOT.fire;
-  eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: spec[0],
-                dmg: Math.round(spec[1] * (mul === undefined ? 1 : mul)), kind, life: 2.8 });
+  const f = { id: pId++, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: spec[0],
+              dmg: Math.round(spec[1] * (mul === undefined ? 1 : mul)), kind, life: 2.8 };
+  eshots.push(f);
+  if (mode === 'host' && guests.length) evNewShot(f);
 }
 
 /* ---------------- team abilities ---------------- */
@@ -1559,7 +1719,7 @@ function openShop() {
     p.offers = rollOffers(p, OFFER_COUNT);
     if (!p.alive) { p.alive = true; p.hp = Math.round(maxHp(p) / 2); p.hurt = 1; }
   }
-  eshots = []; puddles = [];
+  eshots = []; puddles = []; hazards = [];
 }
 function buyRow(p, row) {
   const say = m => { p.msg = m; p.msgT = 2; };
@@ -1626,7 +1786,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
   const rg = rage * slow;
   const a = Math.atan2(tdy, tdx);
   const room = () => zombies.length + newZ.length < spawnCap();
-  z.t1 -= dt; z.t2 -= dt; z.t3 -= dt;
+  z.t1 -= dt; z.t2 -= dt; z.t3 -= dt; z.t4 -= dt;
   switch (z.key) {
     case 'brood':
       if (z.t1 <= 0) {
@@ -1634,11 +1794,25 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         if (room()) for (let k = 0; k < 3; k++) newZ.push(makeZombie('crawler', z.x + rand(-50, 50), z.y + rand(-50, 50), true));
         burst(z.x, z.y, '#a08660', 16, 160, 6);
       }
-      if (z.t2 <= 0) { z.t2 = 3.0 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .25, 230, 'acid'); }
+      if (z.t2 <= 0) { z.t2 = 3.4 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .25, 230, 'acid'); }
+      if (z.t3 <= 0) {                                   // egg sacs hatch where you stand
+        z.t3 = 7 * rg;
+        for (let k = 0; k < 3; k++)
+          addZone(t.x + rand(-160, 160), t.y + rand(-160, 160), 72, 1.6, 22, '#c7a86b', h => {
+            if (room()) newZ.push(makeZombie('crawler', h.x, h.y, true));
+          });
+      }
       break;
     case 'pyre':
-      if (z.t1 <= 0) { z.t1 = 3.6 * rg; for (let k = 0; k < 9; k++) eShot(z.x, z.y, k / 9 * 6.283 + time, 200, 'fire'); }
-      if (z.t2 <= 0) { z.t2 = 2.4 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .18, 280, 'fire'); }
+      if (z.t1 <= 0) { z.t1 = 3.9 * rg; for (let k = 0; k < 7; k++) eShot(z.x, z.y, k / 7 * 6.283 + time, 200, 'fire'); }
+      if (z.t3 <= 0) {                                   // meteors rain on the squad
+        z.t3 = 6 * rg;
+        for (const q of players) {
+          if (!q.alive || q.gone) continue;
+          addZone(q.x + rand(-110, 110), q.y + rand(-110, 110), 86, 1.3, 36, '#ff7a2f');
+        }
+      }
+      if (z.t2 <= 0) { z.t2 = 2.8 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .18, 280, 'fire'); }
       if (Math.random() < .5) particles.push({ x: z.x + rand(-z.r, z.r), y: z.y - z.r * 1.4, vx: 0, vy: -60, life: .4, max: .4, size: 7, color: '#ff7a2f' });
       break;
     case 'wraith':
@@ -1647,7 +1821,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         if (z.blinkT <= 0) {
           burst(z.x, z.y, '#9ad7ff', 20, 200, 6);
           z.x = z.bx; z.y = z.by;
-          for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283, 210, 'orb');
+          for (let k = 0; k < 7; k++) eShot(z.x, z.y, k / 7 * 6.283, 210, 'orb');
           burst(z.x, z.y, '#9ad7ff', 20, 200, 6);
           addShake(8);
         }
@@ -1660,6 +1834,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         z.t2 = 8 * rg;
         if (room()) for (let k = 0; k < 2; k++) newZ.push(makeZombie('ghoul', z.x + rand(-40, 40), z.y + rand(-40, 40), true));
       }
+      if (z.t3 <= 0) { z.t3 = 9 * rg; addBeam(z, a - .9, 900, 1.0, .8, 1.3, 22, '#9ad7ff'); }
       break;
     case 'colossus':
       if (z.chargeT > 0) {
@@ -1673,17 +1848,23 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       if (z.t2 <= 0) {
         z.t2 = 4.6 * rg;
         addShake(10);
-        beams.push({ ring: true, x1: z.x, y1: z.y, r: 230, color: '#8c969e', life: .45, max: .45 });
-        for (const p of players) if (p.alive && !p.gone && dist(p, z) < 230) hurt(p, z.dmg);
-        for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283 + .2, 250, 'bone');
+        addRing(z.x, z.y, 620, 420, Math.round(z.dmg * .8), '#8c969e');
+        for (let k = 0; k < 5; k++) eShot(z.x, z.y, k / 5 * 6.283 + .2, 250, 'bone');
+      }
+      if (z.t3 <= 0) {                                   // the floor gives way where it stamps
+        z.t3 = 8 * rg;
+        for (let k = 0; k < 4; k++) addZone(z.x + rand(-220, 220), z.y + rand(-220, 220), 90, 1.2, 30, '#8c969e');
       }
       break;
     case 'tyrant':                                   // full bullet hell
       if (z.t1 <= 0) {
-        z.t1 = .34 * rg;
-        z.spin = (z.spin || 0) + .62;
+        z.t1 = .50 * rg;
+        z.arms = (z.arms || 0) + 1;
+        if (z.arms % 9 === 0) z.dir = -(z.dir || 1);      // reverses, so you cannot just orbit it
+        z.spin = (z.spin || 0) + .70 * (z.dir || 1);
         for (let k = 0; k < 3; k++) eShot(z.x, z.y, z.spin + k / 3 * 6.283, 195, 'orb');
       }
+      if (z.t3 <= 0) { z.t3 = 7 * rg; addRing(z.x, z.y, 560, 340, 26, '#ffd24a'); }
       if (z.t2 <= 0) {
         z.t2 = 5 * rg;
         if (room()) for (let k = 0; k < 3; k++) newZ.push(makeZombie('runner', z.x + rand(-50, 50), z.y + rand(-50, 50), true));
@@ -1691,7 +1872,7 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       break;
     case 'plague':
       if (z.t1 <= 0) {
-        z.t1 = 2.8 * rg;
+        z.t1 = 3.2 * rg;
         for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .28, 240, 'acid');
       }
       if (z.t2 <= 0) {
@@ -1708,15 +1889,31 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         for (const o of zombies) if (o !== z && !o.dead && !o.boss && dist(o, z) < 320 && o.hp < o.max) { o.hp = Math.min(o.max, o.hp + o.max * .3); any = true; }
         if (any) beams.push({ ring: true, x1: z.x, y1: z.y, r: 320, color: '#a9f0c8', life: .4, max: .4 });
       }
+      if (z.t4 <= 0) {                                   // spore bloom, then puddles where it lands
+        z.t4 = 8 * rg;
+        addRing(z.x, z.y, 520, 250, 24, '#9fe08a');
+        for (let k = 0; k < 3; k++)
+          addZone(t.x + rand(-170, 170), t.y + rand(-170, 170), 70, 1.4, 24, '#9fe08a',
+                  h => puddles.push({ x: h.x, y: h.y, r: 44, life: 6 }));
+      }
       break;
     case 'frost':
       if (z.t1 <= 0) {
         z.t1 = 4.2 * rg;
         beams.push({ ring: true, x1: z.x, y1: z.y, r: 300, color: '#b8e8ff', life: .5, max: .5 });
         for (const p of players) if (p.alive && !p.gone && dist(p, z) < 300) { p.slow = 2.5; hurt(p, z.dmg * .5); }
-        for (let k = 0; k < 12; k++) eShot(z.x, z.y, k / 12 * 6.283, 170, 'ice');
+        for (let k = 0; k < 8; k++) eShot(z.x, z.y, k / 8 * 6.283, 170, 'ice');
       }
-      if (z.t2 <= 0) { z.t2 = 2.3 * rg; for (let k = -2; k <= 2; k++) eShot(z.x, z.y, a + k * .16, 290, 'ice'); }
+      if (z.t3 <= 0) {                                   // shards burst up from the floor
+        z.t3 = 6.5 * rg;
+        for (const q of players) {
+          if (!q.alive || q.gone) continue;
+          const zn = addZone(q.x + rand(-90, 90), q.y + rand(-90, 90), 80, 1.2, 28, '#b8e8ff');
+          if (zn) zn.chill = true;
+        }
+        addRing(z.x, z.y, 500, 280, 20, '#b8e8ff', true);
+      }
+      if (z.t2 <= 0) { z.t2 = 2.6 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .2, 290, 'ice'); }
       break;
     case 'gravelord':
       if (z.t1 <= 0) {
@@ -1732,7 +1929,13 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
         corpses = corpses.filter(c => !c.used);
         if (!raised && room()) for (let k = 0; k < 2; k++) newZ.push(makeZombie('walker', z.x + rand(-60, 60), z.y + rand(-60, 60), true));
       }
-      if (z.t2 <= 0) { z.t2 = 2.6 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .2, 330, 'bone'); }
+      if (z.t2 <= 0) { z.t2 = 3.0 * rg; for (let k = -1; k <= 1; k++) eShot(z.x, z.y, a + k * .2, 330, 'bone'); }
+      if (z.t3 <= 0) {                                   // a wall of spears walks toward you
+        z.t3 = 7 * rg;
+        const px = Math.cos(a + 1.571), py = Math.sin(a + 1.571);
+        for (let k = -2; k <= 2; k++)
+          addZone(t.x + px * k * 86, t.y + py * k * 86, 62, 1.0 + Math.abs(k) * .12, 26, '#d8d0c0');
+      }
       break;
     case 'devourer':
       if (z.chargeT > 0) { z.chargeT -= dt; z.charging = true; if (z.chargeT <= 0) z.charging = false; }
@@ -1745,6 +1948,11 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
           const d = dist(p, z);
           if (d < 420 && d > 1) { p.x += (z.x - p.x) / d * 150; p.y += (z.y - p.y) / d * 150; solid(p); }
         }
+        addRing(z.x, z.y, 420, 330, Math.round(z.dmg * .7), '#e8734a');
+      }
+      if (z.t3 <= 0) {                                   // it spits you back out
+        z.t3 = 9 * rg;
+        for (let k = 0; k < 5; k++) addZone(z.x + rand(-200, 200), z.y + rand(-200, 200), 78, 1.1, 28, '#e8734a');
       }
       break;
     case 'warden':
@@ -1754,15 +1962,14 @@ function bossBrain(z, t, tdx, tdy, bd, dt) {
       }
       if (z.wardT > 0) {
         z.wardT -= dt; z.ward = true; z.frozen = true;
-        z.wardShot = (z.wardShot || 0) - dt;
-        if (z.wardShot <= 0) {
-          z.wardShot = .36 * rg;
-          z.spin = (z.spin || 0) + .55;
-          for (let k = 0; k < 3; k++) eShot(z.x, z.y, z.spin + k / 3 * 6.283, 220, 'void');
+        if (!z.wardBeams) {
+          z.wardBeams = true;
+          addBeam(z, a, 820, .85, .5, 2.2, 18, '#c0b0ff');
+          addBeam(z, a + 3.1416, 820, .85, .5, 2.2, 18, '#c0b0ff');
         }
-        if (z.wardT <= 0) z.ward = false;
+        if (z.wardT <= 0) { z.ward = false; z.wardBeams = false; }
       }
-      if (z.t2 <= 0) { z.t2 = .42 * rg; eShot(z.x, z.y, a + rand(-.12, .12), 340, 'void'); }
+      if (z.t2 <= 0) { z.t2 = .70 * rg; eShot(z.x, z.y, a + rand(-.12, .12), 340, 'void'); }
       break;
   }
 }
@@ -1776,8 +1983,31 @@ function eliteFire(z, t, bd, dt) {
   // more players in the game means elites shoot noticeably faster
   const boost = (1 / (1 + ELITE_RATE_PER_PLAYER * (teamSize() - 1))) * (activeMods.has('elites') ? .72 : 1);
   z.eT = P.every * boost * (z.mini ? 1.4 : 1);
+  const aim = Math.atan2(t.y - z.y, t.x - z.x);
+  switch (P.type) {
+    case 'beam':
+      addBeam(z, aim - .75, 780, (Math.random() < .5 ? 1 : -1) * 1.05, .75, 1.0, 20, '#c77ddb');
+      return;
+    case 'zones':
+      for (let k = 0; k < 3; k++) addZone(t.x + rand(-150, 150), t.y + rand(-150, 150), 74, 1.15, 30, '#b6e04a');
+      return;
+    case 'ring':
+      addRing(z.x, z.y, 470, 300, 28, '#9ad7ff');
+      return;
+    case 'burst':
+      addZone(z.x, z.y, 62, .6, 0, '#ff7a2f', h => {
+        const off = rand(0, 6.283);
+        for (let k = 0; k < P.shots; k++) eShot(h.x, h.y, off + k / P.shots * 6.283, P.speed, P.kind);
+      });
+      return;
+    case 'twin':
+      z.eAng = (z.eAng || 0) + .31;
+      eShot(z.x, z.y, z.eAng, P.speed, P.kind);
+      eShot(z.x, z.y, 3.1416 - z.eAng, P.speed, P.kind);
+      return;
+  }
   if (!P.aim) z.eAng += .34;
-  const base = P.aim ? Math.atan2(t.y - z.y, t.x - z.x) : z.eAng;
+  const base = P.aim ? aim : z.eAng;
   const n = P.shots;
   for (let k = 0; k < n; k++) {
     const ang = P.aim
@@ -1828,6 +2058,7 @@ function separate() {
 function update(dt) {
   time += dt;
   frameNo++;
+  evTick++;
   newZ = [];
 
   fieldT -= dt;
@@ -2069,7 +2300,7 @@ function update(dt) {
       if (tg && bd < 460 && m.shootT <= 0) {
         m.shootT = .5;
         const a = Math.atan2(tg.y - m.y, tg.x - m.x) + rand(-.06, .06);
-        bullets.push({ kind: 'bullet', x: m.x, y: m.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760,
+        spawnBullet({ kind: 'bullet', x: m.x, y: m.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760,
           dmg: m.dmg, owner: own, slot: MINION_SLOT, life: .8, pierce: 0, hit: new Set(),
           size: 3, color: '#9ad7ff', crit: 0, bounces: 0, ricochet: 0 });
       }
@@ -2128,6 +2359,7 @@ function update(dt) {
     }
     if (!b.dead && b.life <= 0) { if (b.kind === 'flame') b.dead = true; else end(); }
   }
+  if (mode === 'host' && guests.length) for (const b of bullets) if (b.dead && b.id && b.kind !== 'homing') evDeadBullet(b);
   bullets = bullets.filter(b => !b.dead);
 
   // ---- enemy projectiles ----
@@ -2150,7 +2382,9 @@ function update(dt) {
       stop(); break;
     }
   }
+  if (mode === 'host' && guests.length) for (const f of eshots) if (f.dead && f.id) evDeadShot(f);
   eshots = eshots.filter(f => !f.dead);
+  updateHazards(dt);
 
   zombies = zombies.filter(z => !z.dead).concat(newZ);
   barricades = barricades.filter(b => {
@@ -2233,17 +2467,17 @@ function takeLoot(p, l, force) {
   if (l.taken) return;
   const it = l.item;
   if (it.kind === 'mod') {
-    const sl = p.slots[p.cur];
-    if (!sl) return;
     const M = MODS[it.id];
-    if (!addMod(sl, it.id)) {
-      if (force) floatText(p.x, p.y - 34, `${M.name} is maxed on ${sl.name}`, '#8f8870');
+    const sl = modTarget(p, it.id);
+    if (!sl) {
+      if (force) floatText(p.x, p.y - 34, 'Every weapon you carry is full of mods', '#8f8870');
       return;
     }
+    addMod(sl, it.id);
     l.taken = true;
     sl.max = maxAmmo(sl, p);
     const n = sl.mods[it.id];
-    banner(`${p.name} fitted ${M.name}${n > 1 ? ' x' + n : ''} to ${sl.name}`, M.color);
+    banner(`${p.name} fitted ${M.name}${n > 1 ? ' x' + n : ''} to ${sl.name} (${modTotal(sl)}/${MOD_SLOTS})`, M.color);
     burst(l.x, l.y, M.color, 24, 200, 5);
     return;
   }
@@ -2557,6 +2791,7 @@ function drawWorld() {
     if (k.type === 'ammo') for (const ox of [-6, -1, 4]) ctx.fillRect(k.x + ox, k.y - 6 + bobY, 3, 12);
     else { ctx.fillRect(k.x - 7, k.y - 2 + bobY, 14, 4); ctx.fillRect(k.x - 2, k.y - 7 + bobY, 4, 14); }
   }
+  drawHazards();
   for (const l of loot) if (vis(l)) drawLoot(l);
   for (const st of strikes) {
     const k = 1 - st.t / st.max;
@@ -2903,6 +3138,11 @@ function drawHud() {
   if (mode !== 'solo') {
     ctx.textAlign = 'right'; ctx.font = `12px ${FONT}`; ctx.fillStyle = '#8f8870';
     ctx.fillText(roomCode ? `Room ${roomCode}  ·  ${teamSize()} players${mode === 'host' ? '  ·  K to remove' : ''}` : '', W - 14, 20);
+    if (mode === 'guest') {
+      const stale = (performance.now() - lastSnapAt) / 1000;
+      ctx.fillStyle = stale > 1 ? '#e2735f' : myPing > 260 ? '#f2b134' : '#6b8f5a';
+      ctx.fillText(stale > 1 ? 'connection stalled' : `ping ${myPing}ms`, W - 14, 40);
+    }
   }
 
   let y = AY + 8;
@@ -3000,8 +3240,9 @@ function drawShop() {
   ctx.font = `bold 17px ${FONT}`;
   if (upcoming % BOSS_EVERY === 0) {
     ctx.fillStyle = '#e2735f';
-    const key = bossOrder[(upcoming / BOSS_EVERY - 1) % bossOrder.length];
-    ctx.fillText(`Next: wave ${upcoming}, ${BOSS_BY_KEY[key].name}`, W / 2, 98);
+    const key = bossOrder.length ? bossOrder[(upcoming / BOSS_EVERY - 1) % bossOrder.length] : null;
+    const B = key && BOSS_BY_KEY[key];
+    ctx.fillText(`Next: wave ${upcoming}, ${B ? B.name : 'a boss'}`, W / 2, 98);
   } else {
     ctx.fillStyle = '#e6dfc8';
     ctx.fillText(`Next: wave ${upcoming}`, W / 2, 98);
@@ -3128,7 +3369,7 @@ function drawTitle() {
   });
   const lines = [
     'You aim where you walk. Carry up to three weapons, drop one with X so a teammate can take it.',
-    'Weapon mods stack: fit the same mod twice and it works twice as hard.',
+    `Weapons take ${MOD_SLOTS} mods: mix different ones, or stack the same up to ${MOD_STACK_MAX}.`,
     'Shop upgrades are randomised each visit and never run out, but the price climbs fast.',
     `Every ${BOSS_EVERY}th wave is a boss; heavy waves send minibosses instead of endless small fry.`,
     'Elites fire heavy bullet patterns, and they fire faster the more players you bring.',
@@ -3325,7 +3566,7 @@ function guestJoined(c) {
   sendTo(c, { t: 'welcome', idx, code: roomCode, gm: gameMode });
   if (state !== 'title') {
     addLatePlayer(idx, gst.name, gst.cls);
-    sendTo(c, { t: 'start', gm: gameMode });
+    sendTo(c, { t: 'start', gm: gameMode, bo: bossOrder });
     snapAcc = 1;
     banner(gst.name + ' joined the fight', '#8fd67a');
   }
@@ -3371,7 +3612,8 @@ function guestLeft(gst, why) {
 function broadcastLobby() { send({ t: 'lobby', roster, code: roomCode, gm: gameMode }); }
 function onHostData(gst, d) {
   gst.seen = performance.now();
-  if (!d || typeof d !== 'object' || d.t === 'ping') return;
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'ping') { sendTo(gst.conn, { t: 'pong', k: d.k }); return; }
   if (d.t === 'held' && d.h) {
     const h = netHeld[gst.idx] = {};
     for (const a of ACTIONS) h[a] = !!d.h[a];
@@ -3454,8 +3696,9 @@ function onGuestData(d) {
   else if (d.t === 'lobby') { roster = d.roster || []; if (d.gm) { gameMode = d.gm; syncModeButtons(); } if (state === 'title') lobbyText(); }
   else if (d.t === 'full') { lobby = 'full'; cleanupNet(); setNet(`That room is full (${MAX_PLAYERS} players).`); }
   else if (d.t === 'kicked') { lobby = 'none'; cleanupNet(); state = 'title'; setNet('The host removed you from the room.'); }
-  else if (d.t === 'start') guestStart(d.gm);
-  else if (d.t === 'snap') applySnap(d);
+  else if (d.t === 'start') guestStart(d.gm, d.bo);
+  else if (d.t === 'pong') { myPing = Math.round(performance.now() - lastPing); }
+  else if (d.t === 'snap') { lastSnapAt = performance.now(); applySnap(d); }
 }
 function connectionLost() {
   if (lobby !== 'connected') return;
@@ -3470,10 +3713,29 @@ function backToMenu() {
   setNet('');
 }
 
+/* ---------------- projectile events ---------------- */
+function evBatch() {
+  let b = evLog[evLog.length - 1];
+  if (!b || b.tick !== evTick) {
+    b = { tick: evTick, es: [], xs: [], bu: [], xb: [] };
+    evLog.push(b);
+    while (evLog.length > EV_KEEP) evLog.shift();
+  }
+  return b;
+}
+const evNewShot = f => evBatch().es.push(netShot(f));
+const evDeadShot = f => { if (f.id) evBatch().xs.push(f.id); };
+const evNewBullet = b => evBatch().bu.push(netBullet(b));
+const evDeadBullet = b => { if (b.id) evBatch().xb.push(b.id); };
+const netShot = f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), EKINDS.indexOf(f.kind)];
+const netBullet = b => [b.id, BKINDS.indexOf(b.kind), Math.round(b.x), Math.round(b.y), Math.round(b.vx), Math.round(b.vy),
+  Math.round(b.size), bcol(b.color), (b.slot && b.slot.rarity === 'rare' ? 1 : 0), Math.round(b.life * 100) / 100, b.ricochet || 0];
+
 /* ---------------- host -> guest snapshot ---------------- */
 const BKINDS = ['bullet', 'rocket', 'plasma', 'homing', 'flame'];
 const EKINDS = Object.keys(ESHOT);
 // Stable indexes so snapshots ship numbers instead of type names.
+const HKINDS = ['zone', 'ring', 'beam'];
 const ZKEYS = Object.keys(ZT);
 const BKEYS = BOSSES.map(b => b.key);
 const EPKEYS = Object.keys(ELITE_PATTERNS);
@@ -3497,22 +3759,26 @@ function snapshot() {
     te: teamEnergy, am: [...activeMods], nm: nextMods, sh: f2(shake), best, tsc: teamScore, pe: pvpEnd,
     ma: Object.keys(mastery).map(k => mastery[k].lv),
     pl: players.map(p => ({
-      x: r(p.x), y: r(p.y), dx: f2(p.dx), dy: f2(p.dy), hp: r(p.hp), mh: maxHp(p), al: p.alive, g: p.gone ? 1 : 0,
-      rv: f2(p.rev), w: f2(p.walk % 6.283), hu: p.hurt > 0 ? 1 : 0, sc: p.score, co: p.combo,
-      nm: p.name, rd: p.ready, cs: p.slots[p.cur] ? netSlot(p.slots[p.cur]) : 0,
-      cl: p.cls, tm: p.team, k: p.kills, d: p.deaths, gg: p.gg, rs: f2(p.respawn),
-      sp: f2(Math.max(0, p.spawnProt)), sd: r(p.shield), sm: r(p.shieldMax), at: f2(p.abT), nsl: p.slots.length
+      x: r(p.x), y: r(p.y), a: r(Math.atan2(p.dy, p.dx) * 40), hp: r(p.hp), mh: maxHp(p),
+      f: (p.alive ? 1 : 0) | (p.gone ? 2 : 0) | (p.hurt > 0 ? 4 : 0) | (p.ready ? 8 : 0),
+      rv: r(p.rev * 10), w: r((p.walk % 6.283) * 10), sc: p.score, co: p.combo,
+      nm: p.name, cs: p.slots[p.cur] ? netSlot(p.slots[p.cur]) : 0,
+      cl: p.cls, tm: p.team, k: p.kills, d: p.deaths, gg: p.gg, rs: r(p.respawn * 10),
+      sp: r(Math.max(0, p.spawnProt) * 10), sd: r(p.shield), sm: r(p.shieldMax), at: r(p.abT * 10), nsl: p.slots.length
     })),
-    z: zombies.map(z => [z.id, z.boss ? 100 + BKEYS.indexOf(z.key) : ZKEYS.indexOf(z.type), r(z.x), r(z.y), z.r,
-      f2(Math.max(0, z.hp / z.max)), f2(z.dx), f2(z.dy), f2(z.walk % 6.283),
+    z: zombies.map(z => [z.id, z.boss ? 100 + BKEYS.indexOf(z.key) : ZKEYS.indexOf(z.type), r(z.x), r(z.y),
+      r(Math.max(0, z.hp / z.max) * 100), r(Math.atan2(z.dy, z.dx) * 40), r((z.walk % 6.283) * 10),
       (z.elite ? 1 : 0) | (z.slow > 0 ? 2 : 0) | (z.burn > 0 ? 4 : 0) | (z.charging ? 8 : 0) | (z.ward ? 16 : 0)
       | (z.mini ? 32 : 0) | (z.flash > 0 ? 64 : 0),
       z.blinkT > 0 ? [r(z.bx), r(z.by)] : 0, z.ep ? EPKEYS.indexOf(z.ep) : -1]),
     mi: minions.map(m => [m.id, m.kind === 'drone' ? 0 : 1, r(m.x), r(m.y), f2(m.hp / m.max), f2(m.dx), f2(m.dy),
       f2(m.walk % 6.283), m.flash > 0 ? 1 : 0]),
-    bu: bullets.map(b => [BKINDS.indexOf(b.kind), r(b.x), r(b.y), r(b.vx), r(b.vy), r(b.size), ci(b.color),
-      b.slot && b.slot.rarity === 'rare' ? 1 : 0, f2(b.life)]),
-    es: eshots.map(e => [r(e.x), r(e.y), r(e.vx), r(e.vy), e.r, EKINDS.indexOf(e.kind)]),
+    hz: hazards.map(h => h.kind === 'zone'
+      ? [0, r(h.x), r(h.y), r(h.r), f2(h.t), f2(h.warn), 0, 0, ci(h.color)]
+      : h.kind === 'ring'
+      ? [1, r(h.x), r(h.y), r(h.r), r(h.max), r(h.speed), 0, 0, ci(h.color)]
+      : [2, r(h.x), r(h.y), f2(h.a), r(h.len), f2(h.t), f2(h.dur), f2(h.spin), ci(h.color)]),
+    bh: bullets.filter(b => b.kind === 'homing').map(b => [b.id, r(b.x), r(b.y), r(b.vx), r(b.vy), r(b.size), ci(b.color)]),
     be: beams.map(b => b.swing ? [2, r(b.x1), r(b.y1), b.r, ci(b.color), f2(b.life / b.max), f2(b.a), f2(b.arc)]
                       : b.ring ? [1, r(b.x1), r(b.y1), b.r, ci(b.color), f2(b.life / b.max)]
                                : [0, r(b.x1), r(b.y1), r(b.x2), r(b.y2), b.w, ci(b.color), f2(b.life / b.max)]),
@@ -3535,26 +3801,51 @@ function snapshot() {
 }
 // Only ship what a guest can actually see. This is what keeps 8-player rooms
 // from drowning in traffic when the screen is full of bullets.
-function cullFor(base, px, py) {
-  const near = (x, y) => Math.abs(x - px) < CULL_W && Math.abs(y - py) < CULL_H;
+function cullFor(base, px, py, q) {
+  const cw = q ? CULL_W * .85 : CULL_W, ch = q ? CULL_H * .85 : CULL_H;
+  const near = (x, y) => Math.abs(x - px) < cw && Math.abs(y - py) < ch;
   return Object.assign({}, base, {
     z: base.z.filter(a => a[1] >= 100 || near(a[2], a[3])),
-    bu: base.bu.filter(a => near(a[1], a[2])),
-    es: base.es.filter(a => near(a[0], a[1])),
-    pa: base.pa.filter(a => near(a[0], a[1])),
-    mi: base.mi.filter(a => near(a[2], a[3]))
+    pa: q === 2 ? [] : base.pa.filter(a => near(a[0], a[1])),
+    dc: q ? [] : base.dc,
+    mi: base.mi.filter(a => near(a[2], a[3])),
+    hz: base.hz
   });
 }
 
+// Everything that spawned or died since this guest last heard from us. If they
+// have fallen too far behind, hand them the live set and let them start clean.
+function eventsFor(gst) {
+  const behind = !gst.evTick || evTick - gst.evTick > EV_KEEP - 4;
+  if (behind) {
+    gst.evTick = evTick;
+    return { full: 1,
+      es: eshots.filter(f => f.id).map(netShot),
+      bu: bullets.filter(b => b.id && b.kind !== 'homing').map(netBullet),
+      xs: [], xb: [] };
+  }
+  const out = { es: [], xs: [], bu: [], xb: [] };
+  for (const b of evLog) {
+    if (b.tick <= gst.evTick) continue;
+    if (b.es.length) out.es.push(...b.es);
+    if (b.xs.length) out.xs.push(...b.xs);
+    if (b.bu.length) out.bu.push(...b.bu);
+    if (b.xb.length) out.xb.push(...b.xb);
+  }
+  gst.evTick = evTick;
+  return out;
+}
+
 /* guest side */
-function guestStart(gm) {
+function guestStart(gm, bo) {
   if (gm) gameMode = gm;
+  bossOrder = (bo && bo.length) ? bo.slice() : BOSSES.map(b => b.key);
   mastery = {};
   for (const id in W_DEFS) mastery[id] = { lv: 0 };
   players = [];
   zombies = []; bullets = []; eshots = []; barricades = []; puddles = []; barrels = [];
   particles = []; pickups = []; loot = []; texts = []; banners = []; beams = []; bolts = [];
-  strikes = []; meds = []; minions = []; feed = []; corpses = [];
+  strikes = []; meds = []; minions = []; feed = []; corpses = []; hazards = [];
   activeMods = new Set(); nextMods = [];
   setupMap();
   resetGround();
@@ -3588,10 +3879,10 @@ function applySnap(S) {
   S.pl.forEach((q, i) => {
     const p = players[i];
     const self = i === myIndex;
-    p.name = q.nm; p.gone = !!q.g; p.hp = q.hp; p.cls = cleanClass(q.cl); p.team = q.tm;
-    p.rev = q.rv; p.hurt = q.hu ? .1 : 0; p.score = q.sc; p.combo = q.co; p.ready = q.rd;
-    p.kills = q.k; p.deaths = q.d; p.gg = q.gg; p.respawn = q.rs; p.spawnProt = q.sp;
-    p.shield = q.sd; p.shieldMax = q.sm; p.abT = q.at;
+    p.name = q.nm; p.gone = !!(q.f & 2); p.hp = q.hp; p.cls = cleanClass(q.cl); p.team = q.tm;
+    p.rev = q.rv / 10; p.hurt = (q.f & 4) ? .1 : 0; p.score = q.sc; p.combo = q.co; p.ready = !!(q.f & 8);
+    p.kills = q.k; p.deaths = q.d; p.gg = q.gg; p.respawn = q.rs / 10; p.spawnProt = q.sp / 10;
+    p.shield = q.sd; p.shieldMax = q.sm; p.abT = q.at / 10;
     const [body, head] = TEAMS() ? TEAM_COLORS[q.tm] : PLAYER_COLORS[i % PLAYER_COLORS.length];
     p.body = body; p.head = head;
     if (self && S.me) {
@@ -3603,35 +3894,46 @@ function applySnap(S) {
       p.slots = q.cs ? [guestSlot(q.cs)] : []; p.cur = 0;
       p.up = p.up || {};
       p.up.armor = Math.max(0, Math.round((q.mh - (CLASSES[p.cls] || CLASSES.soldier).hp) / 22));
+      p.maxHpNet = q.mh;
     }
-    const revived = !p.alive && q.al;
-    p.alive = q.al;
+    const alive = !!(q.f & 1);
+    const revived = !p.alive && alive;
+    p.alive = alive;
     p.tx = q.x; p.ty = q.y;
     const far = Math.hypot(q.x - p.x, q.y - p.y) > 150;
     if (p.fresh || far || revived || (self && (!p.alive || state !== 'play'))) { p.x = q.x; p.y = q.y; p.fresh = false; }
-    if (!self) { p.dx = q.dx; p.dy = q.dy; p.walk = q.w; }
+    if (!self) { const pa = q.a / 40; p.dx = Math.cos(pa); p.dy = Math.sin(pa); p.walk = q.w / 10; }
   });
   if (!players[myIndex]) return;
 
   const old = new Map(zombies.map(z => [z.id, z]));
   zombies = S.z.map(a => {
-    const [id, ti, x, y, rr, hpk, dx, dy, walk, flags, blink, ep] = a;
-    let z = old.get(id);
+    const [id, ti, x, y, hp100, angq, walkq, flags, blink, ep] = a;
+    const ang = angq / 40, dx = Math.cos(ang), dy = Math.sin(ang), hpk = hp100 / 100, walk = walkq / 10;
+    let z = old.get(id), z0r = 0;
     if (!z) {
       const bossKey = ti >= 100 ? BKEYS[ti - 100] : null;
       const boss = bossKey ? BOSS_BY_KEY[bossKey] : null;
       const T = boss || ZT[ZKEYS[ti]] || ZT.walker;
+      z0r = boss ? Math.round(boss.r * ((flags & 32) ? MINI_R : 1)) : Math.round(T.r * ((flags & 1) ? 1.3 : 1));
       z = { id, type: boss ? 'boss' : ZKEYS[ti], boss: !!boss, key: bossKey || undefined,
             name: boss ? ((flags & 32) ? 'Lesser ' + boss.name.replace(/^The /, '') : boss.name) : '',
             body: T.body, head: T.head, shield: !!T.shield, bloat: !!T.bloat, necro: !!T.necro,
             x, y, wob: id % 7 };
     }
-    Object.assign(z, { tx: x, ty: y, r: rr, hp: hpk, max: 1, dx, dy, walk, flash: (flags & 64) ? 1 : 0,
+    if (z0r) z.r = z0r;
+    Object.assign(z, { tx: x, ty: y, hp: hpk, max: 1, dx, dy, walk, flash: (flags & 64) ? 1 : 0,
       elite: !!(flags & 1), slow: flags & 2 ? 1 : 0, burn: flags & 4 ? 1 : 0,
       charging: !!(flags & 8), ward: !!(flags & 16), mini: !!(flags & 32),
       ep: ep >= 0 ? EPKEYS[ep] : undefined, cdx: dx, cdy: dy,
       blinkT: blink ? 1 : 0, bx: blink ? blink[0] : 0, by: blink ? blink[1] : 0 });
     return z;
+  });
+  hazards = (S.hz || []).map(a => {
+    const kind = HKINDS[a[0]], col = pal[a[8]];
+    if (kind === 'zone') return { kind, x: a[1], y: a[2], r: a[3], t: a[4], warn: a[5], color: col };
+    if (kind === 'ring') return { kind, x: a[1], y: a[2], r: a[3], max: a[4], speed: a[5], color: col };
+    return { kind, x: a[1], y: a[2], a: a[3], len: a[4], t: a[5], dur: a[6], spin: a[7], color: col };
   });
   const oldM = new Map(minions.map(m => [m.id, m]));
   minions = (S.mi || []).map(a => {
@@ -3642,9 +3944,33 @@ function applySnap(S) {
     return m;
   });
 
-  bullets = S.bu.map(([k, x, y, vx, vy, size, c, rare, life]) =>
-    ({ kind: BKINDS[k], x, y, vx, vy, size, color: pal[c], slot: { rarity: rare ? 'rare' : 'base' }, life }));
-  eshots = S.es.map(([x, y, vx, vy, rr, k]) => ({ x, y, vx, vy, r: rr, kind: EKINDS[k] }));
+  // projectiles: apply spawns and deaths, then fly them ourselves
+  if (S.full) { bullets = bullets.filter(b => b.kind === 'homing'); eshots = []; }
+  const lag = clamp(myPing / 2000, 0, .2);
+  if (S.es && S.es.length) {
+    const have = new Set(eshots.map(f => f.id));
+    for (const [id, x, y, vx, vy, k] of S.es) {
+      if (have.has(id)) continue;
+      const kind = EKINDS[k] || 'fire', spec = ESHOT[kind] || ESHOT.fire;
+      eshots.push({ id, x: x + vx * lag, y: y + vy * lag, vx, vy, r: spec[0], kind, life: 2.8 - lag });
+    }
+  }
+  if (S.xs && S.xs.length) { const gone = new Set(S.xs); eshots = eshots.filter(f => !gone.has(f.id)); }
+  if (S.bu && S.bu.length) {
+    const have = new Set(bullets.map(b => b.id));
+    for (const [id, k, x, y, vx, vy, size, c, rare, life, ric] of S.bu) {
+      if (have.has(id)) continue;
+      bullets.push({ id, kind: BKINDS[k] || 'bullet', x: x + vx * lag, y: y + vy * lag, vx, vy, size,
+                     color: BCOLORS[c] || '#fff3c4', slot: { rarity: rare ? 'rare' : 'base' },
+                     life: Math.max(.05, life - lag), ricochet: ric || 0, bounces: 0 });
+    }
+  }
+  if (S.xb && S.xb.length) { const gone = new Set(S.xb); bullets = bullets.filter(b => !gone.has(b.id)); }
+  if (S.bh) {
+    bullets = bullets.filter(b => b.kind !== 'homing');
+    for (const [id, x, y, vx, vy, size, c] of S.bh)
+      bullets.push({ id, kind: 'homing', x, y, vx, vy, size, color: pal[c], slot: { rarity: 'base' }, life: 2.5 });
+  }
   beams = S.be.map(b => b[0] === 2
     ? { swing: true, x1: b[1], y1: b[2], r: b[3], color: pal[b[4]], life: b[5], max: 1, a: b[6], arc: b[7] }
     : b[0] === 1
@@ -3704,23 +4030,47 @@ function guestFrame(dt) {
   for (const m of minions) { m.x += (m.tx - m.x) * smooth; m.y += (m.ty - m.y) * smooth; }
   for (const b of bullets) {
     b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.kind !== 'homing') {
+      b.life -= dt;
+      if (b.life <= 0) { b.dead = true; continue; }
+      if (isBlockedAt(b.x, b.y)) {
+        if (b.ricochet && b.bounces < b.ricochet * 2) {
+          const px = b.x - b.vx * dt, py = b.y - b.vy * dt;
+          const hx = isBlockedAt(b.x, py), hy = isBlockedAt(px, b.y);
+          if (hx) b.vx = -b.vx;
+          if (hy) b.vy = -b.vy;
+          if (!hx && !hy) { b.vx = -b.vx; b.vy = -b.vy; }
+          b.x = px; b.y = py; b.bounces++; b.life += .25;
+        } else { b.dead = true; continue; }
+      }
+    }
     if (b.kind === 'flame') b.size += dt * 34;
     else if ((b.kind === 'rocket' || b.kind === 'homing') && Math.random() < .7)
       particles.push({ x: b.x, y: b.y, vx: rand(-20, 20), vy: rand(-20, 20), life: .35, max: .35, size: 5, color: '#8a8478', local: 1 });
     else if (b.kind === 'plasma' && Math.random() < .8)
       particles.push({ x: b.x, y: b.y, vx: rand(-30, 30), vy: rand(-30, 30), life: .3, max: .3, size: 4, color: b.color, local: 1 });
   }
+  bullets = bullets.filter(b => !b.dead);
   for (const e of eshots) {
     e.x += e.vx * dt; e.y += e.vy * dt;
+    e.life -= dt;
+    if (e.life <= 0 || e.x < 0 || e.x > WW || e.y < 0 || e.y > WH || isBlockedAt(e.x, e.y)) { e.dead = true; continue; }
     if (Math.random() < .35) {
       const col = (ESHOT[e.kind] || ESHOT.fire)[2];
       particles.push({ x: e.x, y: e.y, vx: rand(-15, 15), vy: rand(-15, 15), life: .3, max: .3, size: 5, color: col, local: 1 });
     }
   }
+  eshots = eshots.filter(e => !e.dead);
   for (const q of particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .9; q.vy *= .9; q.life -= dt; }
   particles = particles.filter(q => q.life > 0);
   if (particles.length > 700) particles.splice(0, particles.length - 700);
   for (const q of strikes) q.t = Math.max(0, q.t - dt);
+  for (const h of hazards) {
+    if (h.kind === 'zone') h.t -= dt;
+    else if (h.kind === 'ring') h.r += h.speed * dt;
+    else { h.a += h.spin * dt; h.t -= dt; }
+  }
+  hazards = hazards.filter(h => h.kind === 'ring' ? h.r <= h.max : h.t > -.2);
   if (players.length && (state === 'play' || state === 'shop' || state === 'paused')) updateCam(dt, false);
 }
 
@@ -3769,12 +4119,22 @@ document.getElementById('bJoin').addEventListener('click', e => { e.currentTarge
 
 // Runs off the render loop so a backgrounded tab still reports in.
 setInterval(() => {
-  if (mode === 'guest' && conn && conn.open) { send({ t: 'ping' }); lastPing = performance.now(); }
+  if (mode === 'guest' && conn && conn.open) { lastPing = performance.now(); send({ t: 'ping', k: ++pingSeq }); }
 }, 2000);
 
 /* ---------------- loop ---------------- */
-let last = performance.now();
+let last = performance.now(), loopErrs = 0;
+// One bad frame used to kill requestAnimationFrame and freeze the game for
+// good. Now a frame can fail, get logged, and the next one still runs.
 function loop(now) {
+  try { frame(now); }
+  catch (e) {
+    if (loopErrs++ < 3) console.error('Blockrot frame error:', e);
+    for (const k in pressed) delete pressed[k];
+  }
+  requestAnimationFrame(loop);
+}
+function frame(now) {
   const dt = Math.min(.033, (now - last) / 1000); last = now;
   menu.style.display = state === 'title' ? 'flex' : 'none';
   modeRow.style.display = mode === 'guest' ? 'none' : 'flex';
@@ -3811,24 +4171,29 @@ function loop(now) {
       if (wantRestart) startGame();
     }
     for (const k in netTaps) netTaps[k] = {};
+    // Each guest gets its own cadence. A backed up channel means that player
+    // gets fewer, smaller updates instead of everyone waiting on them.
     if (mode === 'host' && guests.length && state !== 'title') {
-      snapAcc += dt;
-      if (snapAcc >= (guests.length > 5 ? .085 : guests.length > 2 ? .066 : .05)) {
-        snapAcc = 0;
-        const base = snapshot();
-        for (const gst of guests) {
-          const dc = gst.conn.dataChannel;
-          if (dc && dc.bufferedAmount > 300000) continue;   // this guest is lagging; skip a frame for them
-          const pl = players[gst.idx];
-          const view = pl ? cullFor(base, pl.x, pl.y) : base;
-          sendTo(gst.conn, Object.assign(view, { you: gst.idx, me: pl ? detailFor(pl) : null }));
-        }
+      const baseIv = guests.length > 5 ? .085 : guests.length > 2 ? .066 : .05;
+      let base = null;
+      for (const gst of guests) {
+        const dc = gst.conn.dataChannel;
+        const buf = dc ? dc.bufferedAmount : 0;
+        gst.q = buf > 120000 ? 2 : buf > 35000 ? 1 : 0;
+        gst.acc = (gst.acc || 0) + dt;
+        if (gst.acc < baseIv * (gst.q === 2 ? 2.4 : gst.q === 1 ? 1.5 : 1)) continue;
+        gst.acc = 0;
+        if (buf > 400000) continue;                  // hopelessly backed up, let it drain
+        if (!base) base = snapshot();
+        const pl = players[gst.idx];
+        const view = pl ? cullFor(base, pl.x, pl.y, gst.q) : Object.assign({}, base);
+        Object.assign(view, eventsFor(gst), { you: gst.idx, me: pl ? detailFor(pl) : null });
+        sendTo(gst.conn, view);
       }
     }
   }
   draw();
   for (const k in pressed) delete pressed[k];
-  requestAnimationFrame(loop);
 }
 setupMap();
 resetGround();
