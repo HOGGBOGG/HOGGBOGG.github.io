@@ -117,7 +117,7 @@ kbd{font-family:Orbitron,sans-serif;font-weight:700;font-size:.78em;display:inli
   <div id="menu" class="ov show">
     <div class="panel">
       <h1>Stick<em>Xenoverse</em></h1>
-      <p class="tag">Up to twelve stick warriors across five floating islands. Knock them off, blast them down, and top the board before the clock runs out.</p>
+      <p class="tag">A platform fighter for up to twelve. No health bars &mdash; damage builds up, knockback grows with it, and you lose a life by going over the edge. Grab a weapon and last the longest.</p>
       <label class="fld"><span>Name</span><input id="pname" maxlength="12" placeholder="You" autocomplete="off"></label>
 
       <h4>Brawl</h4>
@@ -145,7 +145,7 @@ kbd{font-family:Orbitron,sans-serif;font-weight:700;font-size:.78em;display:inli
       </div>
       <button data-act="pvp">Two players, one keyboard</button>
 
-      <button data-act="moves">Controls and combos</button>
+      <button data-act="moves">How to play</button>
       <p class="hint">Esc pauses &nbsp;&middot;&nbsp; M mutes sound</p>
       <p class="touch">This game needs a keyboard.</p>
     </div>
@@ -163,48 +163,54 @@ kbd{font-family:Orbitron,sans-serif;font-weight:700;font-size:.78em;display:inli
 
   <div id="moves" class="ov center">
     <div class="card">
-      <h2>Controls and combos</h2>
+      <h2>How to play</h2>
       <div class="cols">
         <div>
+          <h3>The idea</h3>
+          <p class="small-print">There is no health bar. Every hit adds to your damage, and the higher that
+          number climbs the further the next hit sends you. You lose a life by leaving the map, not by running
+          out of health. Three lives each &mdash; last one standing wins.</p>
           <h3>Moving</h3>
           <table>
-            <tr><td><kbd>A</kbd> <kbd>D</kbd></td><td>Run</td></tr>
-            <tr><td><kbd>W</kbd></td><td>Jump, press again for a double jump. Let go early for a short hop.</td></tr>
-            <tr><td><kbd>S</kbd></td><td>Hold to raise your ki barrier. In the air, dive faster. Tap twice on a thin ledge to drop through.</td></tr>
-            <tr><td><kbd>Space</kbd></td><td>Step dodge. Hold a direction to boost. Cancels your own recovery.</td></tr>
+            <tr><td><kbd>A</kbd> <kbd>D</kbd> or <kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Run</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>Jump. Press again in the air for a second jump. Let go early for a short hop.</td></tr>
+            <tr><td><kbd>S</kbd> or <kbd>&darr;</kbd></td><td>Drop faster. Tap twice on a thin ledge to fall through it.</td></tr>
+            <tr><td><kbd>L</kbd> or <kbd>Shift</kbd></td><td>Dodge. You cannot be hit for a moment. Hold a direction to roll that way.</td></tr>
           </table>
-          <h3>On the ground</h3>
+          <h3>Weapons</h3>
           <table>
-            <tr><td><kbd>J</kbd></td><td>Jab. <kbd>J</kbd><kbd>J</kbd><kbd>J</kbd> ends in a spin kick.</td></tr>
-            <tr><td><kbd>J</kbd><kbd>J</kbd><kbd>K</kbd></td><td>Jab string into a heavy punch</td></tr>
-            <tr><td><kbd>K</kbd></td><td>Heavy punch</td></tr>
-            <tr><td><kbd>A</kbd>/<kbd>D</kbd>+<kbd>K</kbd></td><td>Rush punch, boosts forward</td></tr>
-            <tr><td><kbd>W</kbd>+<kbd>K</kbd></td><td>Uppercut, launches</td></tr>
-            <tr><td><kbd>L</kbd></td><td>Kick</td></tr>
-            <tr><td><kbd>A</kbd>/<kbd>D</kbd>+<kbd>L</kbd></td><td>Slide kick. If it hits, press <kbd>W</kbd> to chase them up.</td></tr>
-            <tr><td><kbd>S</kbd>+<kbd>L</kbd></td><td>Sweep</td></tr>
+            <tr><td>Walk over one</td><td>Picks it up. You can only carry one.</td></tr>
+            <tr><td><kbd>H</kbd> or <kbd>E</kbd></td><td>Throw it at someone. It hurts, and then you are empty-handed.</td></tr>
           </table>
+          <p class="small-print"><b>Sword</b> even and quick. <b>Hammer</b> slow but sends people flying.
+          <b>Spear</b> long reach. <b>Blasters</b> shoot from range. Without a weapon your signatures are
+          feeble, so go and find one. Drop it when you are knocked out.</p>
         </div>
         <div>
+          <h3>Attacking</h3>
+          <p class="small-print">Two buttons. <kbd>J</kbd> or <b>left click</b> is a quick attack,
+          <kbd>K</kbd> or <b>right click</b> is a slow signature. What you get depends on the direction you hold.</p>
+          <table>
+            <tr><td><kbd>J</kbd></td><td>Quick attack. Press it again to keep the string going.</td></tr>
+            <tr><td>side + <kbd>J</kbd></td><td>Side attack, good reach</td></tr>
+            <tr><td><kbd>&darr;</kbd> + <kbd>J</kbd></td><td>Low attack, pops them up</td></tr>
+            <tr><td><kbd>K</kbd></td><td>Signature. Slow, heavy, needs a weapon.</td></tr>
+            <tr><td>side + <kbd>K</kbd></td><td>Lunging signature</td></tr>
+            <tr><td><kbd>&darr;</kbd> + <kbd>K</kbd></td><td>Ground slam, hits both sides</td></tr>
+          </table>
           <h3>In the air</h3>
           <table>
-            <tr><td><kbd>J</kbd></td><td>Air jab</td></tr>
-            <tr><td><kbd>K</kbd></td><td>Hammer fist, spikes them down</td></tr>
-            <tr><td><kbd>L</kbd></td><td>Air kick</td></tr>
-            <tr><td><kbd>W</kbd>+<kbd>L</kbd></td><td>Flip kick</td></tr>
-            <tr><td><kbd>S</kbd>+<kbd>L</kbd></td><td>Meteor dive</td></tr>
-            <tr><td><kbd>W</kbd>+<kbd>K</kbd></td><td>Uppercut, once per jump. Good for getting back.</td></tr>
+            <tr><td><kbd>J</kbd></td><td>Air attack</td></tr>
+            <tr><td>side + <kbd>J</kbd></td><td>Side air</td></tr>
+            <tr><td><kbd>&darr;</kbd> + <kbd>J</kbd></td><td>Down air. Spikes them toward the floor.</td></tr>
+            <tr><td><kbd>K</kbd></td><td>Recovery. Launches you upward, once per jump. This is how you get back.</td></tr>
+            <tr><td><kbd>&darr;</kbd> + <kbd>K</kbd></td><td>Ground pound. Drops like a stone.</td></tr>
           </table>
-          <h3>Ki attacks</h3>
-          <table>
-            <tr><td><kbd>I</kbd></td><td>Ki blast, costs 20 ki</td></tr>
-            <tr><td><kbd>S</kbd> <kbd>D</kbd> <kbd>I</kbd></td><td>Wave cannon, costs 40. Tap down, then a direction, then I.</td></tr>
-            <tr><td><kbd>S</kbd>+<kbd>I</kbd></td><td>Explosive wave on both sides, costs 35</td></tr>
-            <tr><td><kbd>W</kbd>+<kbd>I</kbd></td><td>Rising dragon, costs 60. Super armour on the way up.</td></tr>
-          </table>
-          <p class="small-print">Ki charges as you land hits and take them. At 60 ki your aura ignites and your hair burns gold. Falling out of the arena costs 15 health. The less health you have, the farther you fly.</p>
-          <h3>Player two</h3>
-          <p class="small-print">Arrow keys to move, jump and guard. <kbd>Num 4</kbd> <kbd>5</kbd> <kbd>6</kbd> <kbd>8</kbd> work like J K L I (or <kbd>,</kbd> <kbd>.</kbd> <kbd>/</kbd> <kbd>;</kbd> on laptops). Dodge with <kbd>Num 0</kbd> or <kbd>Right Shift</kbd>.</p>
+          <h3>Two on one keyboard</h3>
+          <p class="small-print">Player one uses <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> with
+          <kbd>F</kbd> attack, <kbd>G</kbd> signature, <kbd>V</kbd> dodge, <kbd>B</kbd> throw.
+          Player two uses the arrow keys with <kbd>.</kbd> attack, <kbd>/</kbd> signature,
+          <kbd>Right Shift</kbd> dodge, <kbd>'</kbd> throw.</p>
         </div>
       </div>
       <button data-act="back" style="width:auto;margin-top:.9em">Back</button>
@@ -215,7 +221,7 @@ kbd{font-family:Orbitron,sans-serif;font-weight:700;font-size:.78em;display:inli
     <div class="card small">
       <h2>Paused</h2>
       <button data-act="resume">Resume</button>
-      <button data-act="moves">Controls and combos</button>
+      <button data-act="moves">How to play</button>
       <button data-act="mute">Mute sound</button>
       <button data-act="quit">Quit to menu</button>
     </div>
@@ -236,7 +242,7 @@ kbd{font-family:Orbitron,sans-serif;font-weight:700;font-size:.78em;display:inli
 'use strict';
 
 // ---------- constants ----------
-const W = 1280, H = 720, MAXHP = 100, GUARD_MAX = 60;
+const W = 1280, H = 720;
 // Movement is tuned for snap: quick run-up, hard gravity coming down, short hops when you
 // let go of jump early, plus coyote time and a jump buffer so inputs never feel eaten.
 const GRAV = 0.86, FALLMUL = 1.30, HOPCUT = 1.9, MAXFALL = 17.5, FASTFALL = 24;
@@ -320,6 +326,146 @@ function nearestPlat(x, y){
   return best;
 }
 
+// ---------- weapons ----------
+// Nobody has a health bar here. Damage builds up, knockback scales with it, and
+// the only way out is over the edge. Weapons spawn on the map, change how hard
+// you hit and how far you reach, unlock the three signatures, and can be thrown.
+const STOCKS = 3, DMG_MAX = 999;
+const KB_PER_DMG = .0132;              // how fast knockback grows as damage climbs
+const UNARMED_SIG = .55;               // signatures without a weapon are a shadow of the real thing
+const WPN_MAX = 6, WPN_EVERY = 230;    // weapons on the map at once, and frames between drops
+
+const WEAPONS = {
+  sword:    { name:'Sword',    col:'#dcecff', edge:'#8fb8e8', dmg:1.05, kb:1.02, reach:1.10, spd:1.10 },
+  hammer:   { name:'Hammer',   col:'#ffb45c', edge:'#a35d1e', dmg:1.50, kb:1.38, reach:1.12, spd:0.76 },
+  spear:    { name:'Spear',    col:'#a8f0c8', edge:'#3f8f66', dmg:0.92, kb:0.94, reach:1.50, spd:1.16 },
+  blasters: { name:'Blasters', col:'#8fdcff', edge:'#2b7fa8', dmg:0.86, kb:0.92, reach:1.00, spd:1.22, ranged:true },
+};
+const WPN_KEYS = Object.keys(WEAPONS);
+
+// Blasters swap two of the melee swings for energy shots.
+function moveFor(f, name){
+  const w = f.weapon;
+  if (w && WEAPONS[w].ranged){
+    if (name === 'nsig') return 'cannon';
+    if (name === 'sair') return 'bolt';
+    if (name === 'slight') return 'bolt';
+  }
+  return name;
+}
+const wpnOf = f => f.weapon ? WEAPONS[f.weapon] : null;
+const reachOf = f => f.weapon ? WEAPONS[f.weapon].reach : 1;
+
+function spawnWeapon(){
+  if (G.wpns.length >= WPN_MAX) return;
+  const pl = PLATS[Math.random() * PLATS.length | 0];
+  const kind = WPN_KEYS[Math.random() * WPN_KEYS.length | 0];
+  G.wpns.push({ kind, x:pl.x + 40 + Math.random() * Math.max(20, pl.w - 80), y:pl.y - 26,
+    vy:0, ph:Math.random() * 6.28, rest:true, life:2400, id:++G.wpnId });
+  ring(G.wpns[G.wpns.length - 1].x, G.wpns[G.wpns.length - 1].y, WEAPONS[kind].col, 70);
+}
+function updateWeapons(){
+  if (G.phase === 'fight' && ++G.wpnT >= WPN_EVERY){ G.wpnT = 0; spawnWeapon(); }
+  for (const w of G.wpns){
+    w.ph += .06; w.life--;
+    if (!w.rest){
+      w.vy += GRAV * .55; w.y += w.vy; w.x += w.vx || 0; w.vx = (w.vx || 0) * .96;
+      for (const pl of PLATS){
+        if (w.y >= pl.y && w.y - w.vy <= pl.y + 2 && w.x > pl.x && w.x < pl.x + pl.w){
+          w.y = pl.y - 26; w.vy = 0; w.vx = 0; w.rest = true; break;
+        }
+      }
+    }
+    // picked up by walking into it
+    if (w.life > 0) for (const f of G.f){
+      if (!inPlay(f) || f.weapon || f.state === 'ko' || f.pickCD > 0) continue;
+      if (Math.abs(f.x - w.x) < 44 && Math.abs(f.y - 60 - w.y) < 74){
+        f.weapon = w.kind; w.life = 0;
+        ring(f.x, f.y - 60, WEAPONS[w.kind].col, 90);
+        inkBurst(f.x, f.y - 60, 0, WEAPONS[w.kind].col, 10);
+        floatText(f.x, f.y - 150, WEAPONS[w.kind].name.toUpperCase(), WEAPONS[w.kind].col, 26);
+        netEvent(5, f.x, f.y - 60, f.kit, WPN_KEYS.indexOf(w.kind));
+        if (!G.demo) Snd.play('jump');
+        break;
+      }
+    }
+  }
+  G.wpns = G.wpns.filter(w => w.life > 0 && w.y < WORLD.y1 + 400);
+}
+// throw the weapon you are holding: it flies, it hurts, and then you are empty-handed
+function throwWeapon(f){
+  const w = wpnOf(f); if (!w) return;
+  G.proj.push({ x:f.x + f.facing * 36, y:f.y - 96, vx:19 * f.facing, r:20, owner:f, thrown:f.weapon,
+    dmg:Math.round(15 * w.dmg), kb:[11, -5], hs:24, life:70, age:0, trail:[], spin:0 });
+  netEvent(6, f.x + f.facing * 36, f.y - 96, f.kit, WPN_KEYS.indexOf(f.weapon));
+  f.weapon = null; f.pickCD = 45;
+  if (!G.demo) Snd.play('whoosh', 1.1);
+}
+// what you were carrying falls where you died
+function dropWeapon(f){
+  if (!f.weapon) return;
+  G.wpns.push({ kind:f.weapon, x:f.x, y:f.y - 70, vy:-6, vx:rand(-3, 3), ph:0, rest:false, life:900, id:++G.wpnId });
+  f.weapon = null;
+}
+
+function drawWeaponPickups(){
+  for (const w of G.wpns){
+    if (!inView(w.x - 60, w.y - 60, w.x + 60, w.y + 60)) continue;
+    const W1 = WEAPONS[w.kind], bob = Math.sin(w.ph) * 5;
+    const fade = w.life < 120 && (G.frame >> 2) % 2 === 0 ? .35 : 1;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = rg(w.x, w.y + bob, 46, [[0, hexA(W1.col, .55)], [1, hexA(W1.col, 0)]]);
+    ctx.beginPath(); ctx.arc(w.x, w.y + bob, 46, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.translate(w.x, w.y + bob); ctx.rotate(Math.sin(w.ph * .5) * .25 - .5);
+    drawWeaponShape(w.kind, 1.15);
+    ctx.restore();
+  }
+}
+// drawn pointing along +x so it can be dropped straight onto a hand
+function drawWeaponShape(kind, s){
+  const W1 = WEAPONS[kind];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.scale(s, s);
+  if (kind === 'sword'){
+    ctx.strokeStyle = '#0a0812'; ctx.lineWidth = 11;
+    ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(34, 0); ctx.stroke();
+    ctx.strokeStyle = W1.col; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(33, 0); ctx.stroke();
+    ctx.strokeStyle = W1.edge; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(-10, -6); ctx.lineTo(-10, 6); ctx.stroke();
+  } else if (kind === 'hammer'){
+    ctx.strokeStyle = '#0a0812'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(22, 0); ctx.stroke();
+    ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(22, 0); ctx.stroke();
+    ctx.fillStyle = '#0a0812'; ctx.fillRect(18, -14, 18, 28);
+    ctx.fillStyle = W1.col; ctx.fillRect(20, -11, 14, 22);
+    ctx.fillStyle = W1.edge; ctx.fillRect(20, -11, 14, 7);
+  } else if (kind === 'spear'){
+    ctx.strokeStyle = '#0a0812'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(40, 0); ctx.stroke();
+    ctx.strokeStyle = '#7a6a52'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(40, 0); ctx.stroke();
+    ctx.fillStyle = '#0a0812';
+    poly([[36, -9], [52, 0], [36, 9]]); ctx.fill();
+    ctx.fillStyle = W1.col;
+    poly([[37, -6], [48, 0], [37, 6]]); ctx.fill();
+  } else {
+    ctx.fillStyle = '#0a0812'; ctx.fillRect(-10, -9, 26, 18);
+    ctx.fillStyle = W1.edge; ctx.fillRect(-8, -7, 22, 14);
+    ctx.fillStyle = W1.col; ctx.fillRect(2, -4, 16, 8);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = hexA(W1.col, .8);
+    ctx.beginPath(); ctx.arc(18, 0, 5, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
 // ---------- poses: [torso, hipDrop, frontThigh, frontShin, backThigh, backShin, frontUpper, frontFore, backUpper, backFore]
 const P = (t, d, lf, lb, af, ab) => [t, d, lf[0], lf[1], lb[0], lb[1], af[0], af[1], ab[0], ab[1]];
 const lerpPose = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
@@ -332,54 +478,52 @@ const KO_P  = P(-88, 64, [88, 92], [96, 90], [-100, -95], [-80, -92]);
 const DODGE = P(30, 18, [40, 10], [-40, -20], [80, 160], [60, 150]);
 
 function hover(f, t, su) { if (t <= su) { f.vy = Math.min(f.vy, 1); f.vx *= 0.85; } }
-// Startup and recovery are roughly a quarter shorter than they used to be, so every button
-// answers on the frame you press it and strings flow without waiting on long tails.
+// Three lights on the ground, three in the air, three signatures, a recovery and a
+// ground pound. Signatures need a weapon to hit properly; bare hands are a stopgap.
 const MOVES = {
-  jab1: { su:3, ac:3, re:7, dmg:4, kb:[3,-2], hs:12, hb:{x:15,y:-112,w:52,h:26}, chain:'jab2',
+  nlight1: { su:3, ac:3, re:7, dmg:8, kb:[3,-2], hs:12, hb:{x:15,y:-112,w:52,h:26}, chain:'nlight2',
     w:P(12,8,[25,0],[-25,-8],[60,120],[20,150]), s:P(18,8,[25,0],[-28,-8],[92,90],[20,150]) },
-  jab2: { su:3, ac:3, re:8, dmg:5, kb:[3,-2], hs:14, hb:{x:15,y:-112,w:52,h:26}, chain:'jab3', cancel:true,
+  nlight2: { su:3, ac:3, re:8, dmg:9, kb:[3,-2], hs:14, hb:{x:15,y:-112,w:52,h:26}, chain:'nlight3', cancel:true,
     w:P(14,8,[25,0],[-25,-8],[40,145],[70,120]), s:P(24,8,[28,0],[-30,-10],[40,145],[93,90]) },
-  jab3: { su:5, ac:5, re:14, dmg:9, kb:[9,-7], hs:22, hb:{x:5,y:-102,w:78,h:42}, heavy:true,
+  nlight3: { su:5, ac:5, re:14, dmg:14, kb:[9,-7], hs:22, hb:{x:5,y:-102,w:78,h:42}, heavy:true,
     w:P(-5,4,[30,60],[-15,-5],[-20,40],[-60,0]), s:P(-30,2,[105,95],[-8,-2],[-40,20],[-90,-50]) },
-  heavy: { su:9, ac:4, re:16, dmg:12, kb:[9,-5], hs:24, hb:{x:15,y:-117,w:66,h:36}, heavy:true,
-    w:P(-12,10,[25,0],[-25,-10],[-40,30],[40,150]), s:P(28,12,[40,15],[-40,-25],[95,92],[-30,20]) },
-  rocket: { su:6, ac:10, re:14, dmg:11, kb:[11,-4], hs:24, hb:{x:10,y:-117,w:56,h:42}, heavy:true, trail:true,
-    drive(f,t){ if (t<=this.su) f.vx*=0.55; else if (t<=this.su+this.ac) f.vx=17*f.facing; else f.vx*=0.78; },
-    w:P(20,14,[40,20],[-40,-20],[30,120],[20,140]), s:P(50,16,[60,40],[-65,-45],[97,95],[-70,-80]) },
-  uppercut: { su:4, ac:8, re:16, dmg:10, kb:[2,-16], hs:26, hb:{x:0,y:-178,w:52,h:124}, heavy:true, trail:true,
-    drive(f,t){ if (t===this.su+1){ f.vy=-12.5; f.vx=2.4*f.facing; } else if (f.onGround) f.vx*=0.8; },
-    w:P(20,26,[40,-10],[-30,-10],[20,120],[20,150]), s:P(0,0,[45,-20],[-10,0],[172,178],[-20,60]) },
-  kick: { su:5, ac:4, re:12, dmg:8, kb:[7,-4], hs:18, hb:{x:15,y:-86,w:76,h:30},
+  slight: { su:5, ac:5, re:13, dmg:14, kb:[8,-5], hs:20, hb:{x:12,y:-96,w:84,h:44},
     w:P(0,6,[60,-10],[-10,-2],[40,140],[10,120]), s:P(-18,2,[96,94],[-6,0],[50,120],[-40,40]) },
-  slide: { su:4, ac:14, re:13, dmg:7, kb:[3,-12], hs:28, hb:{x:0,y:-42,w:72,h:40}, low:true, trail:true,
-    drive(f,t){ if (t<=this.su) f.vx*=0.65; else if (t<=this.su+this.ac) f.vx=13.5*f.facing; else f.vx*=0.84; },
-    w:P(10,20,[50,20],[-30,-10],[20,60],[-20,40]), s:P(-50,48,[92,92],[45,80],[-60,-20],[-100,-60]) },
-  sweep: { su:4, ac:5, re:13, dmg:6, kb:[3,-10], hs:24, hb:{x:10,y:-32,w:86,h:30}, low:true,
+  dlight: { su:4, ac:5, re:13, dmg:12, kb:[5,-9], hs:24, hb:{x:10,y:-36,w:92,h:34}, low:true,
     w:P(30,36,[40,40],[-40,0],[70,40],[30,30]), s:P(45,44,[100,95],[-70,10],[85,50],[10,20]) },
-  airJab: { su:3, ac:6, re:8, dmg:5, kb:[4,-4], hs:14, hb:{x:10,y:-117,w:56,h:32}, air:true,
+  nair: { su:3, ac:6, re:9, dmg:11, kb:[5,-4], hs:14, hb:{x:6,y:-120,w:64,h:44}, air:true,
     w:P(5,0,[60,0],[15,-30],[60,110],[-20,40]), s:P(15,0,[60,0],[15,-30],[94,90],[-20,40]) },
-  airHeavy: { su:7, ac:6, re:13, dmg:11, kb:[8,5], hs:22, hb:{x:8,y:-112,w:72,h:64}, air:true, heavy:true,
+  sair: { su:4, ac:6, re:11, dmg:14, kb:[9,-4], hs:18, hb:{x:10,y:-86,w:88,h:36}, air:true,
+    w:P(0,0,[70,0],[20,-30],[40,130],[-30,20]), s:P(-15,0,[98,96],[10,-20],[40,130],[-50,0]) },
+  dair: { su:6, ac:6, re:13, dmg:16, kb:[4,9], hs:22, hb:{x:6,y:-110,w:76,h:70}, air:true, heavy:true, spike:true,
     drive(f,t){ hover(f,t,this.su); },
     w:P(-20,0,[50,-10],[0,-30],[170,160],[160,150]), s:P(35,0,[60,10],[-10,-30],[105,100],[100,95]) },
-  airKick: { su:4, ac:6, re:10, dmg:8, kb:[7,-3], hs:18, hb:{x:10,y:-82,w:76,h:32}, air:true,
-    w:P(0,0,[70,0],[20,-30],[40,130],[-30,20]), s:P(-15,0,[98,96],[10,-20],[40,130],[-50,0]) },
-  flip: { su:4, ac:7, re:11, dmg:9, kb:[3,-13], hs:22, hb:{x:-22,y:-192,w:82,h:104}, air:true,
-    w:P(10,0,[80,20],[40,-10],[-20,30],[-40,10]), s:P(-70,0,[165,172],[70,40],[-100,-80],[-80,-60]) },
-  stomp: { su:6, ac:70, re:11, dmg:12, kb:[3,14], hs:22, hb:{x:-26,y:-52,w:52,h:62}, air:true, untilLand:true, heavy:true, trail:true,
-    drive(f,t){ if (t<=this.su){ f.vy=-1; f.vx*=0.8; } else if (t===this.su+1){ f.vy=21; f.vx=2.4*f.facing; } else if (f.onGround) f.vx*=0.7; },
+  recovery: { su:4, ac:9, re:18, dmg:15, kb:[3,-14], hs:24, hb:{x:0,y:-182,w:58,h:128}, heavy:true, trail:true, once:true,
+    drive(f,t){ if (t===this.su+1){ f.vy=-14.5; f.vx=3*f.facing; } else if (f.onGround) f.vx*=0.8; },
+    w:P(20,26,[40,-10],[-30,-10],[20,120],[20,150]), s:P(0,0,[45,-20],[-10,0],[172,178],[-20,60]) },
+  gpound: { su:6, ac:70, re:14, dmg:20, kb:[3,13], hs:24, hb:{x:-28,y:-56,w:58,h:68}, air:true, untilLand:true,
+    heavy:true, trail:true, spike:true,
+    drive(f,t){ if (t<=this.su){ f.vy=-2; f.vx*=0.75; } else if (t===this.su+1){ f.vy=23; f.vx=0; } else if (f.onGround) f.vx*=0.7; },
     w:P(0,0,[70,30],[50,10],[140,160],[-140,-160]), s:P(0,0,[4,0],[-6,0],[165,175],[-165,-175]) },
-  blast: { su:7, ac:1, re:13, cost:20, proj:{spd:13,r:14,dmg:7,kb:[6,-3],hs:16,life:85},
-    drive(f,t){ hover(f,t,this.su+4); if (f.onGround) f.vx*=0.75; },
+
+  // signatures: slow, committal, and the reason to hunt for a weapon
+  nsig: { su:11, ac:5, re:20, dmg:24, kb:[11,-8], hs:28, hb:{x:10,y:-126,w:80,h:58}, heavy:true, sig:true, trail:true,
+    w:P(-12,10,[25,0],[-25,-10],[-40,30],[40,150]), s:P(28,12,[40,15],[-40,-25],[95,92],[-30,20]) },
+  ssig: { su:10, ac:10, re:20, dmg:26, kb:[15,-6], hs:30, hb:{x:6,y:-124,w:96,h:56}, heavy:true, sig:true, trail:true,
+    drive(f,t){ if (t<=this.su) f.vx*=0.55; else if (t<=this.su+this.ac) f.vx=15*f.facing; else f.vx*=0.78; },
+    w:P(20,14,[40,20],[-40,-20],[30,120],[20,140]), s:P(50,16,[60,40],[-65,-45],[97,95],[-70,-80]) },
+  dsig: { su:12, ac:8, re:22, dmg:25, kb:[10,-13], hs:30, hb:{x:-135,y:-70,w:270,h:70,centered:true}, heavy:true, sig:true,
+    drive(f,t){ f.vx*=0.7; if (t===this.su+1){ ring(f.x,f.y-10,KICOL(f),180,true); shard(f.x,f.y,12);
+      G.shake=Math.max(G.shake,10); G.flash=Math.max(G.flash,.2); if(!G.demo) Snd.play('heavy'); } },
+    w:P(0,-4,[20,0],[-20,0],[170,178],[-170,-178]), s:P(40,40,[40,40],[-40,-10],[60,20],[20,0]) },
+
+  // blasters swap two swings for energy shots
+  bolt: { su:5, ac:1, re:12, dmg:9, proj:{spd:15,r:13,dmg:9,kb:[7,-3],hs:16,life:70},
+    drive(f,t){ hover(f,t,this.su+3); if (f.onGround) f.vx*=0.75; },
     w:P(-8,8,[25,0],[-25,-10],[-60,-30],[-50,-20]), s:P(15,8,[28,0],[-30,-10],[92,90],[86,88]) },
-  bigBlast: { su:11, ac:1, re:16, cost:40, proj:{spd:10.5,r:28,dmg:16,kb:[12,-7],hs:28,life:115,big:true},
+  cannon: { su:13, ac:1, re:20, dmg:22, sig:true, proj:{spd:11,r:27,dmg:22,kb:[14,-8],hs:30,life:110,big:true},
     drive(f,t){ hover(f,t,this.su+4); if (f.onGround) f.vx*=0.7; },
     w:P(-20,16,[35,0],[-35,-15],[-80,-60],[-90,-70]), s:P(22,16,[40,10],[-45,-20],[93,91],[88,88]) },
-  shockwave: { su:8, ac:7, re:15, cost:35, dmg:10, kb:[9,-9], hs:24, hb:{x:-125,y:-64,w:250,h:64,centered:true}, heavy:true,
-    drive(f,t){ f.vx*=0.7; if (t===this.su+1){ ring(f.x,f.y-10,KICOL(f),165,true); shard(f.x,f.y,10); G.shake=Math.max(G.shake,9); G.flash=Math.max(G.flash,.2); if(!G.demo) Snd.play('heavy'); } },
-    w:P(0,-4,[20,0],[-20,0],[170,178],[-170,-178]), s:P(40,40,[40,40],[-40,-10],[60,20],[20,0]) },
-  dragon: { su:4, ac:20, re:18, cost:60, dmg:18, kb:[4,-17], hs:32, hb:{x:-30,y:-175,w:82,h:178}, heavy:true, trail:true, armor:true,
-    drive(f,t){ if (t===this.su+1){ f.vy=-18.5; f.vx=3.2*f.facing; G.flash=Math.max(G.flash,.16); } if (t>this.su && t<=this.su+this.ac && G.frame%2===0) inkBurst(f.x,f.y-60,0,KICOL(f),1); if (f.onGround && t<=this.su) f.vx*=0.7; },
-    w:P(15,30,[40,-10],[-30,-10],[40,160],[20,150]), s:P(-5,0,[40,-10],[-15,0],[176,180],[-30,30]) },
 };
 // ---------- sound ----------
 const Snd = {
@@ -420,31 +564,33 @@ const Snd = {
 };
 
 // ---------- game state ----------
-const G = { mode:'menu', demo:true, paused:false, pvp:false, rules:'duel', diff:'normal', frame:0, round:0,
+const G = { mode:'menu', demo:true, paused:false, pvp:false, rules:'brawl', diff:'normal', frame:0, round:0,
   phase:'intro', phaseT:0, timer:99, timerTick:0, hitstop:0, slow:0, slowSkip:false, shake:0, flash:0, zoom:0,
   myIdx:0, f:[], proj:[], stains:[], feed:[], cam:{x:STAGE.x+STAGE.w/2,y:STAGE.y-200,z:1,zz:1},
-  view:{x0:0,y0:0,x1:W,y1:H}, ev:[], botCount:8,
+  view:{x0:0,y0:0,x1:W,y1:H}, ev:[], botCount:8, wpns:[], wpnT:0, wpnId:0, winner:null,
   net:{ on:false, role:'', code:'', peer:null, conn:null, guests:[], roster:[], myIdx:0,
         ping:null, pingAt:0, seq:0, snapT:0, lastMask:-1, outMask:0, lastSnap:0 } };
 const FX = [];
 
 function makeFighter(idx, kit, label){
-  return { idx, kit, color:KITS[kit].gi, label, x:0, y:0, vx:0, vy:0, facing:1, onGround:true, hp:MAXHP, hpLag:MAXHP,
-    energy:0, state:'idle', st:0, move:null, moveName:'', moveT:0, hitList:new Set(), hitLanded:false, jumps:2,
-    inv:0, stun:0, blockStun:0, guardHP:GUARD_MAX, dodgeCD:0, dodgeInv:false, airDodge:true, airUp:true, dropT:0,
-    lastDownTap:-99, hist:[], prev:{}, inp:{}, buf:null, combo:0, comboT:0, flash:0, noInk:0, wins:0, walkPh:0,
-    drawPose:IDLE.slice(), trail:[], force:null, plat:null, ai:null, coyote:0, jumpBuf:0, dodgeBuf:0, hopCut:false,
-    auraT:0, score:0, deaths:0, respawn:0, gone:false, lastHitBy:null, lastHitT:-999, local:false };
+  return { idx, kit, color:KITS[kit].gi, label, x:0, y:0, vx:0, vy:0, facing:1, onGround:true,
+    dmg:0, dmgLag:0, stocks:STOCKS, out:false, weapon:null, pickCD:0,
+    state:'idle', st:0, move:null, moveName:'', moveT:0, hitList:new Set(), hitLanded:false, jumps:2,
+    inv:0, stun:0, blockStun:0, dodgeCD:0, dodgeInv:false, airDodge:true, airUp:true, dropT:0,
+    lastDownTap:-99, hist:[], prev:{}, inp:{}, buf:null, combo:0, comboT:0, flash:0, walkPh:0,
+    drawPose:IDLE.slice(), trail:[], force:null, plat:null, ai:null, aiLevel:null, coyote:0, jumpBuf:0,
+    dodgeBuf:0, hopCut:false, auraT:0, score:0, deaths:0, respawn:0, gone:false,
+    lastHitBy:null, lastHitT:-999, local:false, pad:null };
 }
 function resetFighter(f, x, y, facing){
-  Object.assign(f, { x, y, vx:0, vy:0, facing, onGround:true, hp:MAXHP, hpLag:MAXHP, energy:20, state:'idle', move:null,
-    moveT:0, jumps:2, inv:0, stun:0, blockStun:0, guardHP:GUARD_MAX, dodgeCD:0, dodgeInv:false, airDodge:true, airUp:true,
-    dropT:0, hist:[], prev:{}, inp:{}, buf:null, combo:0, comboT:0, flash:0, noInk:0, trail:[], force:null,
+  Object.assign(f, { x, y, vx:0, vy:0, facing, onGround:true, dmg:0, dmgLag:0, state:'idle', move:null,
+    moveT:0, jumps:2, inv:0, stun:0, blockStun:0, dodgeCD:0, dodgeInv:false, airDodge:true, airUp:true,
+    dropT:0, hist:[], prev:{}, inp:{}, buf:null, combo:0, comboT:0, flash:0, trail:[], force:null,
     drawPose:IDLE.slice(), coyote:COYOTE, jumpBuf:0, dodgeBuf:0, hopCut:false, auraT:0, respawn:0,
     lastHitBy:null, lastHitT:-999 });
 }
 // in the match, on their feet, not sitting out a respawn
-const inPlay = f => !!f && !f.gone && f.respawn <= 0;
+const inPlay = f => !!f && !f.gone && !f.out && f.respawn <= 0;
 function nearestFoe(f){
   let best = null, bd = Infinity;
   for (const q of G.f){
@@ -467,11 +613,22 @@ function respawnSpot(f){
 
 // ---------- input ----------
 const keys = new Set(), tapped = new Set();
-const MAP1 = { left:['KeyA'], right:['KeyD'], up:['KeyW'], down:['KeyS'], light:['KeyJ'], heavy:['KeyK'], kick:['KeyL'], special:['KeyI'], dodge:['Space'] };
-const MAP2 = { left:['ArrowLeft'], right:['ArrowRight'], up:['ArrowUp'], down:['ArrowDown'], light:['Numpad4','Comma'], heavy:['Numpad5','Period'],
-  kick:['Numpad6','Slash'], special:['Numpad8','Semicolon'], dodge:['Numpad0','ShiftRight'] };
-const MAP_SOLO = {}; for (const k in MAP1) MAP_SOLO[k] = MAP1[k].concat(k==='left'||k==='right'||k==='up'||k==='down' ? MAP2[k] : []);
-const GAME_CODES = new Set([...Object.values(MAP1).flat(), ...Object.values(MAP2).flat()]);
+// Four actions, spelled out in keys people already know. Move with either hand,
+// Space to jump, one attack button, one heavy button, dodge, and one to throw.
+// The mouse works too: left click attacks, right click is the heavy.
+const MAP_SOLO = {
+  left:['KeyA','ArrowLeft'], right:['KeyD','ArrowRight'],
+  up:['KeyW','ArrowUp','Space'], down:['KeyS','ArrowDown'],
+  light:['KeyJ','Mouse0'], heavy:['KeyK','Mouse2'],
+  dodge:['KeyL','ShiftLeft','ShiftRight'], throw:['KeyH','KeyE'],
+};
+// Two on one keyboard: one player per hand, same four actions each.
+const MAP1 = { left:['KeyA'], right:['KeyD'], up:['KeyW'], down:['KeyS'],
+  light:['KeyF'], heavy:['KeyG'], dodge:['KeyV'], throw:['KeyB'] };
+const MAP2 = { left:['ArrowLeft'], right:['ArrowRight'], up:['ArrowUp'], down:['ArrowDown'],
+  light:['Period','Numpad1'], heavy:['Slash','Numpad2'], dodge:['ShiftRight','Numpad0'], throw:['Quote','Numpad3'] };
+const GAME_CODES = new Set([...Object.values(MAP_SOLO).flat(), ...Object.values(MAP1).flat(),
+  ...Object.values(MAP2).flat()].filter(c => !c.startsWith('Mouse')));
 function readKeys(map){ const o = {}; for (const k in map) o[k] = map[k].some(c => keys.has(c) || tapped.has(c)); return o; }
 
 addEventListener('keydown', e => {
@@ -486,9 +643,15 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); if (G.mode === 'play' && !G.paused) togglePause(); });
+addEventListener('mousedown', e => {
+  if (G.mode !== 'play' || G.paused || !e.target || e.target.id !== 'game') return;
+  e.preventDefault();
+  const c = 'Mouse' + e.button; keys.add(c); tapped.add(c);
+});
+addEventListener('mouseup', e => keys.delete('Mouse' + e.button));
+addEventListener('contextmenu', e => { if (G.mode === 'play' && e.target && e.target.id === 'game') e.preventDefault(); });
 
 function pushHist(f, k){ f.hist.push({ k, f:G.frame }); if (f.hist.length > 8) f.hist.shift(); }
-
 // ---------- AI ----------
 const LEVELS = {
   easy:   { react:24, aggr:.35, guard:.12, special:.2, acc:.5 },
@@ -510,8 +673,7 @@ class AI {
       if (me.state === 'hitstun') return this.out(o);
       if (me.vy > 1 && me.jumps > 0 && me.y > pl.y - 170) tap('up');
       else if (me.jumps === 0 && me.vy > 0 && me.y > pl.y - 90 && me.airUp){
-        if (me.energy >= 60 && Math.random() < .5) me.force = 'dragon';
-        else { o.up = true; tap('heavy'); }
+        o.up = true; tap('heavy');
       } else if (me.jumps === 0 && me.airDodge && me.y > pl.y - 20) tap('dodge');
       return this.out(o);
     }
@@ -529,22 +691,33 @@ class AI {
       } else if (adx > 95 || Math.abs(dy) > 75){
         p.move = dir;
         if (dy < -90 && me.onGround && Math.random() < .75) p.jump = true;
-        if (adx > 300 && Math.abs(dy) < 60 && me.energy >= 40 && Math.random() < this.lv.special * .5){ p.move = 0; me.force = 'bigBlast'; me.facing = dir; }
-        else if (adx > 260 && Math.abs(dy) < 60 && me.energy >= 20 && Math.random() < this.lv.special){ p.move = 0; p.face = dir; p.tap = 'special'; }
-        else if (dy < -70 && adx < 90 && me.energy >= 60 && Math.random() < this.lv.special * .6){ me.facing = dir; me.force = 'dragon'; }
+        if (dy < -70 && adx < 120 && me.onGround) p.jump = true;
       } else if (Math.random() < this.lv.aggr){
         p.face = dir; const r = Math.random();
-        if (!me.onGround){ if (dy > 40){ p.down = true; p.tap = 'kick'; } else if (dy < -40){ p.up = true; p.tap = 'kick'; } else p.tap = r < .5 ? 'light' : (r < .75 ? 'kick' : 'heavy'); }
-        else if (dy < -40){ p.up = true; p.tap = 'heavy'; }
-        else if (r < .32){ p.tap = 'light'; this.chain = Math.random() < this.lv.acc ? 2 : 0; }
-        else if (r < .48) p.tap = 'heavy';
-        else if (r < .62) p.tap = 'kick';
-        else if (r < .74){ p.down = true; p.tap = 'kick'; }
-        else if (r < .88){ p.move = dir; p.tap = 'kick'; this.fu = false; }
-        else if (me.energy >= 35){ p.down = true; p.tap = 'special'; }
-        else { p.move = dir; p.tap = 'heavy'; }
+        const armed = !!me.weapon;
+        if (!me.onGround){
+          if (dy > 40){ p.down = true; p.tap = 'light'; }
+          else if (dy < -40 && me.airUp){ p.up = true; p.tap = 'heavy'; }
+          else p.tap = 'light';
+        }
+        else if (r < .30){ p.tap = 'light'; this.chain = Math.random() < this.lv.acc ? 2 : 0; }
+        else if (r < .48){ p.move = dir; p.tap = 'light'; }
+        else if (r < .58){ p.down = true; p.tap = 'light'; }
+        else if (r < .74 && armed) p.tap = 'heavy';
+        else if (r < .88 && armed){ p.move = dir; p.tap = 'heavy'; }
+        else if (armed){ p.down = true; p.tap = 'heavy'; }
+        else { p.move = dir; p.tap = 'light'; }
       } else {
         p.move = Math.random() < .5 ? -dir : 0;
+      }
+      // empty-handed with something lying around? go and get it
+      if (!me.weapon && G.wpns.length){
+        let best = null, bd = 1000;
+        for (const w of G.wpns){ const wd = Math.hypot(w.x - me.x, (w.y - me.y) * .8); if (wd < bd){ bd = wd; best = w; } }
+        if (best && bd > 46 && (bd < 420 || !op.weapon)){
+          p.move = sign(best.x - me.x); p.tap = null; p.down = false;
+          if (best.y < me.y - 70 && me.onGround) p.jump = true;
+        }
       }
       // don't stroll off the edge of your own rock
       if (me.onGround && me.plat && p.move && !p.tap){
@@ -564,10 +737,7 @@ class AI {
     if (!p.hold && p.down && !p.tap && G.frame > (p.release || 0)) p.down = false;
     if (me.state === 'attack'){
       const m = me.move;
-      if (this.chain > 0 && (me.moveName === 'jab1' || me.moveName === 'jab2') && me.moveT > m.su + m.ac && me.hitLanded){ tap('light'); if (o.light) this.chain--; }
-      if (me.moveName === 'slide' && me.hitLanded && !this.fu && me.moveT > m.su + m.ac && Math.random() < this.lv.acc){
-        o.up = true; this.fu = true; this.queue = { k:'light', at:G.frame + 10 };
-      }
+      if (this.chain > 0 && (me.moveName === 'nlight1' || me.moveName === 'nlight2') && me.moveT > m.su + m.ac && me.hitLanded){ tap('light'); if (o.light) this.chain--; }
     }
     if (this.queue && G.frame >= this.queue.at){ tap(this.queue.k); if (o[this.queue.k]) this.queue = null; }
     if (op.state === 'ko') for (const k in o) o[k] = false;
@@ -624,10 +794,8 @@ function step(f){
   // jump buffer: a press within JUMPBUF frames of touching down still gets you a jump
   if (pr('up')) f.jumpBuf = JUMPBUF; else if (f.jumpBuf > 0) f.jumpBuf--;
   if (f.inv > 0) f.inv--; if (f.dodgeCD > 0) f.dodgeCD--; if (f.dropT > 0) f.dropT--;
-  if (f.flash > 0) f.flash--; if (f.noInk > 0) f.noInk--;
+  if (f.flash > 0) f.flash--;
   if (f.comboT > 0 && --f.comboT === 0) f.combo = 0;
-  if (f.state !== 'guard') f.guardHP = Math.min(GUARD_MAX, f.guardHP + .3);
-  if (G.phase === 'fight') f.energy = Math.min(100, f.energy + .025);
   if (pr('down')) pushHist(f, 'D'); if (pr('left')) pushHist(f, 'L'); if (pr('right')) pushHist(f, 'R');
 
   if (f.state === 'ko'){}
@@ -635,7 +803,6 @@ function step(f){
   else if (f.state === 'attack' && f.move) updateAttack(f, i, pr);
   else if (f.state === 'attack') f.state = f.onGround ? 'idle' : 'air';
   else if (f.state === 'dodge') updateDodge(f);
-  else if (f.blockStun > 0){ f.blockStun--; f.state = 'guard'; f.vx *= .82; }
   else freeState(f, i, pr);
 
   physics(f, i);
@@ -647,11 +814,11 @@ function step(f){
   for (const t of f.trail) t.life--;
   f.trail = f.trail.filter(t => t.life > 0);
   // charged fighters shed ki upward the whole time their aura is lit
-  f.auraT = f.energy >= 60 ? Math.min(30, f.auraT + 1) : Math.max(0, f.auraT - 1);
+  f.auraT = rage(f) > .55 ? Math.min(30, f.auraT + 1) : Math.max(0, f.auraT - 1);
   if (f.auraT > 6 && G.phase === 'fight' && G.frame % 5 === 0 && f.state !== 'ko')
     FX.push({ type:'ki', x:f.x + rand(-22, 22), y:f.y - rand(0, 140), vx:rand(-.8, .8), vy:rand(-4.5, -2),
       life:rand(14, 26) | 0, max:26, r:rand(1.6, 3.6), color:KICOL(f) });
-  if (f.hpLag > f.hp) f.hpLag = Math.max(f.hp, f.hpLag - .5); else f.hpLag = f.hp;
+  f.dmgLag += (f.dmg - f.dmgLag) * .25;
   f.prev = { ...i };
 }
 
@@ -668,7 +835,6 @@ function freeState(f, i, pr){
     if (G.frame - f.lastDownTap < 15){ f.dropT = 14; f.onGround = false; f.y += 3; f.lastDownTap = -99; }
     else f.lastDownTap = G.frame;
   }
-  if (f.onGround && i.down && !mv && f.dropT === 0){ f.state = 'guard'; f.vx *= .55; return; }
   if (f.onGround){
     if (mv){
       f.state = 'walk';
@@ -685,43 +851,31 @@ function freeState(f, i, pr){
 
 function pickMove(f, i, press, mv){
   const g = f.onGround;
-  if (press('special')){
-    const h = f.hist, now = G.frame; let dir = 0;
-    for (let a = h.length - 1; a >= 1 && !dir; a--){
-      const e = h[a]; if (now - e.f > 14) break;
-      if (e.k === 'L' || e.k === 'R'){
-        for (let b = a - 1; b >= 0; b--){ const d = h[b]; if (e.f - d.f > 22) break; if (d.k === 'D'){ dir = e.k === 'L' ? -1 : 1; break; } }
-      }
-    }
-    if (dir){ f.facing = dir; f.hist = []; return tryMove(f, 'bigBlast'); }
-    if (i.up) return tryMove(f, 'dragon');
-    if (i.down && g) return tryMove(f, 'shockwave');
-    return tryMove(f, 'blast');
+  if (press('throw') && f.weapon){ throwWeapon(f); return null; }
+  if (press('heavy')){
+    if (!g) return i.down ? 'gpound' : (f.airUp ? 'recovery' : null);
+    if (i.down) return 'dsig';
+    if (mv) return moveFor(f, 'ssig');
+    return moveFor(f, 'nsig');
   }
-  if (press('heavy')){ if (i.up && (g || f.airUp)) return 'uppercut'; if (!g) return 'airHeavy'; return mv ? 'rocket' : 'heavy'; }
-  if (press('kick')){
-    if (!g) return i.down ? 'stomp' : i.up ? 'flip' : 'airKick';
-    return i.down ? 'sweep' : mv ? 'slide' : 'kick';
+  if (press('light')){
+    if (!g) return i.down ? 'dair' : mv ? moveFor(f, 'sair') : 'nair';
+    if (i.down) return 'dlight';
+    if (mv) return moveFor(f, 'slight');
+    return 'nlight1';
   }
-  if (press('light')) return g ? 'jab1' : 'airJab';
   return null;
 }
-function tryMove(f, n){
-  const m = MOVES[n];
-  if ((n === 'dragon' || n === 'uppercut') && !f.onGround && !f.airUp) return null;
-  if ((m.cost || 0) > f.energy){ f.noInk = 30; f.buf = null; if (!G.demo) Snd.play('nope'); return null; }
-  return n;
-}
+function tryMove(f, n){ return n && MOVES[n] ? n : null; }
 function startMove(f, n){
   const m = MOVES[n];
   Object.assign(f, { state:'attack', move:m, moveName:n, moveT:0, hitList:new Set(), hitLanded:false, hopCut:false });
-  f.energy -= m.cost || 0;
-  if ((n === 'uppercut' || n === 'dragon') && !f.onGround) f.airUp = false;
+  if (m.once && !f.onGround) f.airUp = false;
 }
 function updateAttack(f, i, pr){
   const m = f.move; f.moveT++;
   const t = f.moveT, endA = m.su + m.ac;
-  const k = ['light','heavy','kick','special'].find(k => pr(k)); if (k) f.buf = { k, f:G.frame };
+  const k = ['light','heavy'].find(k => pr(k)); if (k) f.buf = { k, f:G.frame };
   if (pr('dodge')) f.dodgeBuf = G.frame;
   if (m.drive) m.drive(f, t); else if (f.onGround) f.vx *= .8;
   if (!f.onGround){ const mv = (i.right ? 1 : 0) - (i.left ? 1 : 0); if (Math.abs(f.vx) < AIRMAX || sign(f.vx) !== mv) f.vx += mv * .35; }
@@ -814,26 +968,10 @@ function land(f, vy){
     } else if (m.air){ f.state = 'idle'; f.move = null; }
   }
 }
-function ringOut(f){
-  const cx = clamp(f.x, WORLD.x0 + 60, WORLD.x1 - 60), cy = clamp(f.y - 60, WORLD.y0 + 80, WORLD.y1 - 60);
-  netEvent(2, cx, cy, f.kit, 0);
-  ring(cx, cy, f.color, 150); inkBurst(cx, cy, 0, KICOL(f), 26); G.shake = 14; flashScreen(.2);
-  const home = respawnSpot(f);
-  if (f.state === 'ko'){ Object.assign(f, { x:home[0], y:home[1] - 900, vx:0, vy:0 }); return; }
-  f.hp = Math.max(0, f.hp - 15);
-  floatText(cx, cy, '-15', f.color, 46);
-  if (!G.demo) Snd.play('heavy');
-  Object.assign(f, { x:home[0], y:home[1] - 460, vx:0, vy:0, stun:0, move:null, jumps:2, airUp:true,
-    airDodge:true, trail:[], hopCut:false });
-  // whoever touched them last in the past four seconds gets the credit for the fall
-  if (f.hp <= 0) koFighter(f, G.frame - f.lastHitT < 240 ? f.lastHitBy : null);
-  else { f.state = 'air'; f.inv = 100; }
-}
 // ---------- combat ----------
 function hurtbox(f){
   let h = 150;
   if (f.state === 'ko') h = 30;
-  else if (f.state === 'guard') h = 125;
   else if (f.state === 'attack' && f.move && f.move.low) h = 80;
   return { x:f.x - 19, y:f.y - h, w:38, h };
 }
@@ -841,9 +979,9 @@ function activeBox(f){
   if (f.state !== 'attack' || !f.move) return null;
   const m = f.move; if (!m.hb) return null;
   const t = f.moveT; if (t <= m.su || t > m.su + m.ac) return null;
-  const hb = m.hb;
-  const x = hb.centered ? f.x + hb.x : f.facing > 0 ? f.x + hb.x : f.x - hb.x - hb.w;
-  return { x, y:f.y + hb.y, w:hb.w, h:hb.h };
+  const hb = m.hb, rc = reachOf(f), w = hb.w * rc;
+  const x = hb.centered ? f.x + hb.x * rc : f.facing > 0 ? f.x + hb.x : f.x - hb.x - w;
+  return { x, y:f.y + hb.y, w:hb.centered ? hb.w * rc : w, h:hb.h };
 }
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
@@ -855,80 +993,68 @@ function canBeHit(d){
 function applyHit(a, d, m, dirX, hx, hy){
   if (!canBeHit(d)) return false;
   const wasStunned = d.stun > 0;
-  let dmg = m.dmg, kbx = m.kb[0] * dirX, kby = m.kb[1];
-  const guarding = d.state === 'guard';
-  const power = dmg / 10;
-  if (guarding){
-    dmg = Math.max(1, Math.round(dmg * .2));
-    d.guardHP -= m.dmg * 2.2;
-    if (d.guardHP <= 0){
-      d.guardHP = GUARD_MAX * .6; d.stun = 55; d.state = 'hitstun'; d.vx = kbx * .3; d.vy = -6;
-      floatText(d.x, d.y - 170, 'guard broken', C.ink, 34); G.shake = 10;
-      if (!G.demo) Snd.play('heavy');
-    } else {
-      d.blockStun = 7 + (m.heavy ? 5 : 0); d.vx = kbx * .5;
-      netEvent(4, hx, hy, d.kit, 0);
-      ring(hx, hy, '#8df0ff', 48);
-      spark(hx, hy, 12);
-      if (!G.demo) Snd.play('block');
-    }
-    G.hitstop = 2;
-  } else {
-    const scale = 1 + (1 - d.hp / MAXHP) * .75;
-    d.state = 'hitstun'; d.move = null; d.buf = null;
-    d.stun = Math.round(m.hs * (.85 + .4 * (1 - d.hp / MAXHP)));
-    d.vx = kbx * scale; d.vy = kby * scale;
-    if (d.onGround && d.vy > 0) d.vy = -d.vy * .5;
-    if (d.vy < -1) d.onGround = false;
-    d.flash = 5;
-    a.combo = wasStunned && a.comboT > 0 ? a.combo + 1 : 1; a.comboT = 70;
-    // hitstop is shorter than it was so combos keep their rhythm, and the weight
-    // that used to come from freezing now comes from the shake, flash and zoom.
-    G.hitstop = Math.min(9, 2 + dmg * .4 | 0);
-    G.shake = Math.max(G.shake, dmg * .8);
-    netEvent(0, hx, hy, a.kit, dmg);
-    spark(hx, hy, 18 + dmg * 2.2);
-    ring(hx, hy, KICOL(a), 40 + dmg * 3.5);
-    inkBurst(hx, hy, dirX, KICOL(a), 6 + dmg);
-    if (m.heavy || dmg >= 10){
-      speedLines(hx, hy, '#ffe9a8', 7 + (dmg / 3 | 0));
-      flashScreen(.1 + dmg * .012);
-      zoomPunch(.02 + dmg * .0035);
-      stain(hx + dirX * 30, hy, d.color);
-    }
-    if (!G.demo) Snd.play(m.heavy || dmg >= 10 ? 'heavy' : 'hit', power);
-  }
-  d.hp = Math.max(0, d.hp - dmg);
+  const wp = wpnOf(a);
+  let mul = wp ? wp.dmg : 1;
+  if (m.sig && !wp) mul *= UNARMED_SIG;
+  const dmg = Math.max(1, Math.round(m.dmg * mul));
+  d.dmg = Math.min(DMG_MAX, d.dmg + dmg);
+  // The whole game is here: knockback scales with the damage already taken, so
+  // nobody dies to a health bar, they die because the next hit sends them out.
+  const kmul = (1 + d.dmg * KB_PER_DMG) * (wp ? wp.kb : (m.sig ? UNARMED_SIG + .3 : 1));
+  d.state = 'hitstun'; d.move = null; d.buf = null;
+  d.stun = Math.round(m.hs * (.8 + Math.min(1.5, d.dmg / 150)));
+  d.vx = m.kb[0] * dirX * kmul;
+  d.vy = m.kb[1] * kmul;
+  if (d.onGround && d.vy > 0 && !m.spike) d.vy = -Math.abs(d.vy) * .6;
+  if (d.vy < -1) d.onGround = false;
+  d.flash = 5;
   d.lastHitBy = a; d.lastHitT = G.frame;
-  a.energy = Math.min(100, a.energy + dmg * 1.3);
-  d.energy = Math.min(100, d.energy + dmg * .7);
-  floatText(hx, hy - 20, '-' + dmg, guarding ? '#777' : d.color, 22 + dmg * 1.4);
+  a.combo = wasStunned && a.comboT > 0 ? a.combo + 1 : 1; a.comboT = 70;
+  G.hitstop = Math.min(10, 2 + (dmg * .3 | 0));
+  G.shake = Math.max(G.shake, dmg * .55);
+  netEvent(0, hx, hy, a.kit, dmg);
+  spark(hx, hy, 16 + dmg * 1.5);
+  ring(hx, hy, KICOL(a), 36 + dmg * 2.2);
+  inkBurst(hx, hy, dirX, KICOL(a), 5 + Math.min(16, dmg));
+  if (m.heavy || dmg >= 16){
+    speedLines(hx, hy, '#ffe9a8', 7 + (dmg / 4 | 0));
+    flashScreen(.08 + dmg * .006);
+    zoomPunch(.02 + dmg * .002);
+    stain(hx + dirX * 30, hy, d.color);
+  }
+  floatText(hx, hy - 20, String(dmg), '#ffffff', 20 + dmg * .9);
+  if (!G.demo) Snd.play(m.heavy || dmg >= 16 ? 'heavy' : 'hit', clamp(dmg / 14, .3, 1.6));
   a.hitLanded = true;
-  if (d.hp <= 0) koFighter(d, a);
   return true;
 }
-function koFighter(d, a){
-  if (d.state === 'ko') return;
-  d.state = 'ko'; d.stun = 0; d.move = null; d.inv = 0; d.deaths++;
-  if (a && a !== d) a.score++; else d.score = Math.max(0, d.score - 1);
-  G.shake = Math.max(G.shake, 20); flashScreen(.5); zoomPunch(.12);
-  netEvent(1, d.x, d.y - 80, a ? a.kit : d.kit, 0);
-  speedLines(d.x, d.y - 80, '#ffffff', 22); ring(d.x, d.y - 80, a ? KICOL(a) : '#ffffff', 260);
+
+// Going off the map is the only way to lose a stock.
+function ringOut(f){
+  if (f.out) return;
+  const cx = clamp(f.x, WORLD.x0 + 60, WORLD.x1 - 60), cy = clamp(f.y - 60, WORLD.y0 + 80, WORLD.y1 - 60);
+  netEvent(2, cx, cy, f.kit, 0);
+  ring(cx, cy, f.color, 200); inkBurst(cx, cy, 0, KICOL(f), 30);
+  speedLines(cx, cy, '#ffffff', 18);
+  G.shake = Math.max(G.shake, 18); flashScreen(.4); zoomPunch(.1);
   if (!G.demo) Snd.play('ko');
-  if (G.rules === 'duel'){
-    if (G.phase === 'fight'){
-      G.phase = 'ko'; G.phaseT = 0; G.slow = 55;
-      // someone always takes the round, even when you walk off the edge yourself
-      const w = a && a !== d ? a : G.f.find(q => q !== d && !q.gone);
-      if (w) w.wins++;
-    }
+  dropWeapon(f);
+  const killer = G.frame - f.lastHitT < 300 && f.lastHitBy && f.lastHitBy !== f ? f.lastHitBy : null;
+  f.stocks--; f.deaths++;
+  if (killer){ killer.score++; killFeed(`${killer.label} sent ${f.label} flying`, killer.color); }
+  else { f.score = Math.max(0, f.score - 1); killFeed(`${f.label} threw it away`, '#9fb4c8'); }
+  Object.assign(f, { dmg:0, dmgLag:0, combo:0, comboT:0, state:'ko', stun:0, move:null, inv:0,
+    vx:0, vy:0, trail:[], lastHitBy:null, lastHitT:-999 });
+  if (f.stocks <= 0){
+    f.out = true; f.respawn = 0;
+    killFeed(`${f.label} is out`, f.color);
+    checkMatchEnd();
   } else {
-    d.respawn = RESPAWN;
-    killFeed(a && a !== d ? `${a.label} KO'd ${d.label}` : `${d.label} fell off the world`,
-             a && a !== d ? a.color : '#9fb4c8');
+    const sp = respawnSpot(f);
+    f.x = sp[0]; f.y = sp[1] - 300;
+    f.respawn = RESPAWN;
   }
 }
-function killFeed(text, color){ G.feed.unshift({ text, color, life:210 }); if (G.feed.length > 5) G.feed.pop(); }
+function killFeed(text, color){ G.feed.unshift({ text, color, life:230 }); if (G.feed.length > 5) G.feed.pop(); }
 function checkHits(){
   const list = G.f.filter(inPlay);
   for (const a of list){
@@ -987,68 +1113,62 @@ function updateProj(){
   G.proj = G.proj.filter(pj => pj.life > 0 && pj.x > WORLD.x0 - 200 && pj.x < WORLD.x1 + 200);
 }
 
-// ---------- rounds ----------
-const RESPAWN = 130;          // frames a KO'd fighter sits out of a brawl
-const FFA_TIME = 180;         // seconds on the brawl clock
+// ---------- match ----------
+const RESPAWN = 110;           // frames on the respawn platform
+const MATCH_TIME = 300;        // seconds before the clock decides it
 
-// cfg: { rules, roster:[{name, kit, ai, local, pad}], pvp, diff, demo, myIdx }
+// cfg: { roster:[{name, kit, ai, local, pad}], pvp, diff, demo, myIdx }
 function setupMatch(cfg){
-  Object.assign(G, { rules:cfg.rules, pvp:!!cfg.pvp, diff:cfg.diff || 'normal', demo:!!cfg.demo,
-    round:0, stains:[], feed:[], proj:[], myIdx:cfg.myIdx == null ? 0 : cfg.myIdx, hitstop:0, slow:0 });
+  Object.assign(G, { rules:cfg.rules || 'brawl', pvp:!!cfg.pvp, diff:cfg.diff || 'normal', demo:!!cfg.demo,
+    round:0, stains:[], feed:[], proj:[], wpns:[], wpnT:0, wpnId:0,
+    myIdx:cfg.myIdx == null ? 0 : cfg.myIdx, hitstop:0, slow:0, winner:null });
   FX.length = 0;
   G.f = cfg.roster.map((r, i) => {
     const f = makeFighter(i, r.kit == null ? i % KITS.length : r.kit, r.name);
-    if (r.ai) f.ai = new AI(r.ai);
+    if (r.ai) { f.ai = new AI(r.ai); f.aiLevel = r.ai; }
     f.local = !!r.local;
     f.pad = r.pad || null;
     return f;
   });
-  if (G.rules === 'duel') startRound(); else startBrawl();
-}
-function startRound(){
-  G.round++;
-  const mid = STAGE.x + STAGE.w / 2;
-  resetFighter(G.f[0], mid - 200, STAGE.y, 1);
-  resetFighter(G.f[1], mid + 200, STAGE.y, -1);
-  for (const f of G.f) if (f.ai) f.ai = new AI(G.demo ? 'normal' : G.diff);
-  G.proj = []; G.phase = 'intro'; G.phaseT = 0; G.timer = 99; G.timerTick = 0; G.slow = 0;
+  startBrawl();
 }
 function startBrawl(){
   G.round = 1;
   G.f.forEach((f, i) => {
     const sp = SPAWNS[i % SPAWNS.length];
     resetFighter(f, sp[0], sp[1], i % 2 ? -1 : 1);
-    f.score = 0; f.deaths = 0; f.wins = 0;
+    f.score = 0; f.deaths = 0; f.stocks = STOCKS; f.out = false; f.weapon = null;
     if (f.ai) f.ai = new AI(f.aiLevel || G.diff);
   });
-  G.proj = []; G.feed = []; G.phase = 'intro'; G.phaseT = 0; G.timer = FFA_TIME; G.timerTick = 0; G.slow = 0;
+  G.proj = []; G.feed = []; G.wpns = []; G.wpnT = WPN_EVERY - 90; G.winner = null;
+  G.phase = 'intro'; G.phaseT = 0; G.timer = MATCH_TIME; G.timerTick = 0; G.slow = 0;
+  for (let k = 0; k < 3; k++) spawnWeapon();
 }
+// alive first, then stocks left, then knockouts, then least damage taken
 function standings(){
-  return G.f.filter(f => !f.gone).slice().sort((a, b) => b.score - a.score || a.deaths - b.deaths || a.idx - b.idx);
+  return G.f.filter(f => !f.gone).slice().sort((a, b) =>
+    (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.stocks - a.stocks || b.score - a.score || a.dmg - b.dmg || a.idx - b.idx);
 }
-function endRoundCheck(){
-  const [a, b] = G.f;
-  if (a.wins >= 2 || b.wins >= 2){
-    if (G.demo){ a.wins = b.wins = 0; G.round = 0; G.stains = []; startRound(); return; }
-    G.mode = 'over';
-    const w = a.wins >= 2 ? a : b;
-    document.getElementById('overTitle').textContent = G.pvp ? `${w.label} wins` : (w === a ? 'You win' : 'The CPU wins');
-    document.getElementById('overSub').textContent = `Rounds ${a.wins} to ${b.wins}.`;
-    showOverlay('over');
-  } else startRound();
+function checkMatchEnd(){
+  if (G.phase !== 'fight') return;
+  const live = G.f.filter(f => !f.gone && !f.out);
+  if (live.length <= 1 && G.f.filter(f => !f.gone).length > 1){
+    G.phase = 'done'; G.phaseT = 0; G.winner = live[0] || null; G.slow = 60; G.shake = 16;
+    flashScreen(.4);
+  }
 }
-function endBrawl(){
+function endMatch(){
   if (G.demo){ startBrawl(); return; }
   G.mode = 'over';
   const rank = standings(), me = G.f[G.myIdx], w = rank[0];
-  if (G.net.role === 'host') netBroadcast({ t:'over', rank:rank.map(f => ({ i:f.idx, n:f.label, s:f.score, d:f.deaths })) });
-  document.getElementById('overTitle').textContent = w === me ? 'You win' : `${w.label} wins`;
-  // built as nodes, never as markup: these names came off the wire
+  if (G.net.role === 'host') netBroadcast({ t:'over',
+    rank:rank.map(f => ({ i:f.idx, n:f.label, s:f.score, d:f.deaths, k:f.stocks })) });
+  document.getElementById('overTitle').textContent = w === me ? 'You win' : `${w ? w.label : 'Nobody'} wins`;
   const sub = document.getElementById('overSub');
   sub.textContent = '';
-  rank.slice(0, 12).forEach((f, i) => {
+  rank.slice(0, MAX_PLAYERS).forEach((f, i) => {
     const row = document.createElement('div');
-    row.textContent = `${i + 1}. ${f.label} — ${f.score} KO${f.score === 1 ? '' : 's'}, ${f.deaths} down`;
+    row.textContent = `${i + 1}. ${f.label} — ${f.score} KO${f.score === 1 ? '' : 's'}, ${f.stocks} left`;
     row.style.color = f === me ? '#ffc93c' : f.color;
     sub.appendChild(row);
   });
@@ -1066,7 +1186,7 @@ function tick(){
   const guest = G.net.on && G.net.role === 'guest';
   const fighting = G.phase === 'fight';
   for (const f of G.f){
-    if (!fighting || f.gone || f.respawn > 0 || f.state === 'ko') f.inp = {};
+    if (!fighting || f.gone || f.out || f.respawn > 0 || f.state === 'ko') f.inp = {};
     else if (f.ai){ const foe = nearestFoe(f); f.inp = foe ? f.ai.think(f, foe) : {}; }
     else if (f.local) f.inp = readKeys(f.pad || MAP_SOLO);
     else if (G.net.role === 'host'){
@@ -1080,16 +1200,19 @@ function tick(){
   }
   tapped.clear();
   for (const f of G.f){
-    if (f.gone) continue;
-    if (guest && f.idx !== G.myIdx){ netLerp(f); continue; }
-    // a KO'd body keeps falling for a beat, then drops back in somewhere quiet.
-    // On a guest the host owns that clock, so we only read it.
-    if (!guest && f.respawn > 0 && --f.respawn <= 0){
-      const sp = respawnSpot(f);
-      resetFighter(f, sp[0], sp[1] - 340, 1);
-      f.state = 'air'; f.inv = 100; f.energy = 25;
-      ring(sp[0], sp[1] - 70, KICOL(f), 150); inkBurst(sp[0], sp[1] - 70, 0, KICOL(f), 14);
+    if (f.gone || f.out) continue;
+    if (f.pickCD > 0) f.pickCD--;
+    // held on the respawn platform, not simulated, so they cannot fall straight back out
+    if (f.respawn > 0){
+      if (!guest && --f.respawn <= 0){
+        const sp = respawnSpot(f);
+        resetFighter(f, sp[0], sp[1] - 280, 1);
+        f.state = 'air'; f.inv = 120;
+        ring(sp[0], sp[1] - 70, KICOL(f), 150); inkBurst(sp[0], sp[1] - 70, 0, KICOL(f), 14);
+      }
+      continue;
     }
+    if (guest && f.idx !== G.myIdx){ netLerp(f); continue; }
     step(f);
   }
   if (guest){
@@ -1097,29 +1220,23 @@ function tick(){
   } else {
     updateProj();
     checkHits();
+    updateWeapons();
   }
   updateFX();
   for (const m of G.feed) m.life--;
   if (G.feed.length && G.feed[G.feed.length - 1].life <= 0) G.feed = G.feed.filter(m => m.life > 0);
 
   if (guest){ netPump(); return; }
-  if (G.phase === 'intro' && G.phaseT >= (G.rules === 'duel' ? 110 : 80)){ G.phase = 'fight'; G.phaseT = 0; }
+  if (G.phase === 'intro' && G.phaseT >= 90){ G.phase = 'fight'; G.phaseT = 0; }
   else if (G.phase === 'fight'){
     if (++G.timerTick >= 60){ G.timerTick = 0; G.timer--; }
     if (G.timer <= 0){
-      G.phase = 'timeup'; G.phaseT = 0;
-      if (G.rules === 'duel'){
-        const [a, b] = G.f;
-        if (a.hp !== b.hp) (a.hp > b.hp ? a : b).wins++;
-        G.timeWinner = a.hp === b.hp ? null : (a.hp > b.hp ? a : b);
-      } else {
-        const rank = standings();
-        G.timeWinner = rank.length > 1 && rank[0].score === rank[1].score ? null : rank[0];
-      }
+      const rank = standings();
+      G.phase = 'done'; G.phaseT = 0;
+      G.winner = rank.length > 1 && rank[0].stocks === rank[1].stocks && rank[0].score === rank[1].score ? null : rank[0];
     }
   }
-  else if (G.phase === 'ko' && G.phaseT >= 170) endRoundCheck();
-  else if (G.phase === 'timeup' && G.phaseT >= 150){ if (G.rules === 'duel') endRoundCheck(); else endBrawl(); }
+  else if (G.phase === 'done' && G.phaseT >= 160) endMatch();
   netPump();
 }
 // ---------- rendering ----------
@@ -1527,15 +1644,22 @@ function drawFigure(x, y, pose, facing, kit, seed, opts){
   const hand = fa[2];
   ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(hand[0], hand[1], 6.5 * sc, 0, TAU); ctx.fill();
   ctx.fillStyle = '#f3f8ff'; ctx.beginPath(); ctx.arc(hand[0], hand[1], 4.2 * sc, 0, TAU); ctx.fill();
+  if (opts.weapon){
+    ctx.save();
+    ctx.translate(hand[0], hand[1]);
+    ctx.rotate(Math.atan2(hand[1] - fa[1][1], hand[0] - fa[1][0]));
+    drawWeaponShape(opts.weapon, sc * .92);
+    ctx.restore();
+  }
 
   drawHead(head[0], head[1], 14 * sc, t, facing, kit, ssj, ink);
 }
 
+const rage = f => clamp((f.dmg || 0) / 170, 0, 1);
 function targetPose(f){
   const s = f.state;
   if (s === 'ko') return KO_P;
   if (s === 'hitstun') return HURT;
-  if (s === 'guard') return GUARD;
   if (s === 'dodge') return DODGE;
   if (s === 'attack' && f.move){
     const m = f.move, t = f.moveT;
@@ -1553,9 +1677,9 @@ function targetPose(f){
 
 function drawFighter(f, seed){
   const kit = KITOF(f);
-  const ssj = f.energy >= 60 && f.state !== 'ko';
-  // aura: always a flicker, flaring on specials and blazing once you are charged
-  let power = f.energy / 100 * .6;
+  const ssj = rage(f) > .68 && f.state !== 'ko';
+  // aura rises with the damage you are carrying, so a dangerous fighter is visibly lit
+  let power = rage(f) * .8;
   if (f.state === 'attack' && f.move && (f.move.heavy || f.move.cost)) power += .45;
   if (ssj) power += .5;
   if (f.state === 'ko') power = 0;
@@ -1589,32 +1713,23 @@ function drawFighter(f, seed){
     drawFigure(f.x, f.y, f.drawPose, f.facing, kit, seed, { ink:'#ffffff' });
     ctx.restore();
   } else {
-    drawFigure(f.x, f.y, f.drawPose, f.facing, kit, seed, { ssj });
+    drawFigure(f.x, f.y, f.drawPose, f.facing, kit, seed, { ssj, weapon:f.weapon });
   }
   ctx.globalAlpha = 1;
-  // ki barrier
-  if (f.state === 'guard'){
-    const k = f.guardHP / GUARD_MAX, r = 66 - (1 - k) * 12;
-    ctx.save(); ctx.translate(f.x, f.y - 68);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = .18 + .3 * k;
-    ctx.fillStyle = rg(0, 0, r, [[0, 'rgba(60,230,255,.05)'], [.7, 'rgba(60,230,255,.35)'], [1, 'rgba(60,230,255,0)']]);
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-    ctx.globalAlpha = .35 + .5 * k;
-    ctx.strokeStyle = k > .35 ? '#8df0ff' : '#ff9a5c'; ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let s = 0; s <= 6; s++){ const a = s / 6 * TAU + G.frame * .01; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
-    ctx.closePath(); ctx.stroke();
-    ctx.lineWidth = 1.2; ctx.globalAlpha = .25 + .25 * k;
-    for (let s = 0; s < 6; s++){ const a = s / 6 * TAU + G.frame * .01;
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); ctx.stroke(); }
-    ctx.restore();
-  }
 }
+
+function drawProj(){}
 
 function drawProj(){
   ctx.save();
   for (const pj of G.proj){
+    if (pj.thrown){
+      ctx.save();
+      ctx.translate(pj.x, pj.y); ctx.rotate((pj.spin = (pj.spin || 0) + .38 * sign(pj.vx)));
+      drawWeaponShape(pj.thrown, 1.1);
+      ctx.restore();
+      continue;
+    }
     const kit = KITOF(pj.owner), col = kit.ki;
     const stretch = 1 + Math.min(.9, Math.abs(pj.vx) / 22);
     ctx.globalCompositeOperation = 'lighter';
@@ -1739,64 +1854,6 @@ function bevelBox(x, y, w, h, cut){
   ctx.lineTo(x + w, y + h); ctx.lineTo(x + cut, y + h); ctx.lineTo(x, y + h - cut);
   ctx.closePath();
 }
-function drawGauges(f, x, right, idx){
-  const bw = 430, kit = KITOF(f.color);
-  // health
-  const hy = 48, hh = 24;
-  ctx.save();
-  slab(x, hy, bw, hh, 14, right);
-  ctx.fillStyle = 'rgba(4,10,22,.82)'; ctx.fill();
-  ctx.save(); ctx.clip();
-  const lag = bw * (f.hpLag / MAXHP), cur = bw * (f.hp / MAXHP);
-  ctx.fillStyle = 'rgba(255,240,180,.85)';
-  ctx.fillRect(right ? x + bw - lag : x, hy, lag, hh);
-  const g = ctx.createLinearGradient(x, hy, x, hy + hh);
-  const low = f.hp / MAXHP < .28;
-  g.addColorStop(0, low ? '#ff9a6a' : shade(kit.gi, .55));
-  g.addColorStop(.45, low ? '#ff3a2a' : kit.gi);
-  g.addColorStop(1, low ? '#8d1409' : kit.giD);
-  ctx.fillStyle = g;
-  ctx.fillRect(right ? x + bw - cur : x, hy, cur, hh);
-  // sheen + leading edge
-  ctx.fillStyle = 'rgba(255,255,255,.22)';
-  ctx.fillRect(right ? x + bw - cur : x, hy + 2, cur, 6);
-  ctx.fillStyle = low && G.frame % 20 < 10 ? '#fff' : 'rgba(255,255,255,.85)';
-  ctx.fillRect(right ? x + bw - cur : x + cur - 4, hy, 4, hh);
-  ctx.restore();
-  slab(x, hy, bw, hh, 14, right);
-  ctx.strokeStyle = '#3ce6ff'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.restore();
-  // ki: five stocks, gold once they are all lit
-  const ew = 300, ex = right ? x + bw - ew : x, ey = 80, eh = 13, segs = 5, gap = 4;
-  const sw = (ew - gap * (segs - 1)) / segs, full = f.energy >= 60;
-  for (let s = 0; s < segs; s++){
-    const sx = ex + s * (sw + gap);
-    slab(sx, ey, sw, eh, 7, right);
-    ctx.fillStyle = f.noInk > 0 && G.frame % 6 < 3 ? 'rgba(200,40,40,.5)' : 'rgba(4,10,22,.8)'; ctx.fill();
-    const fillK = clamp((f.energy - s * 20) / 20, 0, 1);
-    if (fillK > 0){
-      ctx.save(); ctx.clip();
-      const gg = ctx.createLinearGradient(sx, ey, sx, ey + eh);
-      gg.addColorStop(0, full ? '#fff2b0' : '#bff4ff');
-      gg.addColorStop(.5, full ? '#ffc93c' : '#3ce6ff');
-      gg.addColorStop(1, full ? '#ff8a1e' : '#0d7fa8');
-      ctx.fillStyle = gg;
-      ctx.fillRect(right ? sx + sw - sw * fillK : sx, ey, sw * fillK, eh);
-      ctx.restore();
-    }
-    slab(sx, ey, sw, eh, 7, right);
-    ctx.strokeStyle = full ? 'rgba(255,201,60,.9)' : 'rgba(60,230,255,.55)'; ctx.lineWidth = 1.6; ctx.stroke();
-  }
-  if (full){
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = .25 + Math.sin(G.frame * .12) * .15;
-    ctx.fillStyle = '#ffc93c'; ctx.fillRect(ex - 6, ey - 5, ew + 12, eh + 10);
-    ctx.restore();
-  }
-  ctx.font = `600 17px ${FONT2}`; ctx.textAlign = right ? 'left' : 'right';
-  ctx.fillStyle = full ? '#ffc93c' : 'rgba(150,200,225,.9)';
-  ctx.fillText('KI', right ? ex - 26 : ex + ew + 26, ey + 12);
-}
 function drawPortrait(f, cx, cy, r, idx){
   const kit = KITOF(f);
   ctx.save();
@@ -1807,62 +1864,12 @@ function drawPortrait(f, cx, cy, r, idx){
   ctx.save(); ctx.clip();
   ctx.fillStyle = rg(cx, cy + r * .4, r * 1.4, [[0, hexA(kit.gi, .55)], [1, 'rgba(0,0,0,0)']]);
   ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-  drawHead(cx, cy + r * .12, r * .62, 0, 1, kit, f.energy >= 60, '#0a0812');
+  drawHead(cx, cy + r * .12, r * .62, 0, 1, kit, rage(f) > .68, '#0a0812');
   ctx.restore();
   ctx.beginPath();
   for (let k = 0; k < 6; k++){ const a = k / 6 * TAU - Math.PI / 2; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
   ctx.closePath();
-  ctx.strokeStyle = f.energy >= 60 ? '#ffc93c' : '#3ce6ff'; ctx.lineWidth = 2.5; ctx.stroke();
-  ctx.restore();
-}
-function drawHUD(){
-  const [a, b] = G.f;
-  const bw = 430;
-  [[a, 92, false], [b, W - 92 - bw, true]].forEach(([f, x, right], idx) => {
-    drawPortrait(f, right ? x + bw + 34 : x - 34, 62, 30, idx);
-    // name plate
-    ctx.save();
-    slab(right ? x + bw - 250 : x, 12, 250, 26, 12, right);
-    ctx.fillStyle = 'rgba(6,14,28,.75)'; ctx.fill();
-    ctx.strokeStyle = hexA(KITOF(f).gi, .8); ctx.lineWidth = 1.6; ctx.stroke();
-    ctx.restore();
-    slant(right ? x + bw - 14 : x + 14, 33, f.label.toUpperCase(), `600 24px ${FONT}`, '#e6f7ff', 'rgba(3,8,18,.9)', 4, null, right ? 'right' : 'left');
-    // round pips as diamonds
-    for (let k = 0; k < 2; k++){
-      const px = right ? x + bw - 244 - k * 22 : x + 244 + k * 22;
-      ctx.save(); ctx.translate(px, 25); ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = f.wins > k ? '#ffc93c' : 'rgba(6,14,28,.75)';
-      ctx.fillRect(-7, -7, 14, 14);
-      ctx.strokeStyle = f.wins > k ? '#fff3c2' : 'rgba(60,230,255,.55)'; ctx.lineWidth = 2;
-      ctx.strokeRect(-7, -7, 14, 14);
-      ctx.restore();
-    }
-    drawGauges(f, x, right, idx);
-    ctx.textAlign = right ? 'right' : 'left';
-    slant(right ? x + bw - 10 : x + 10, 69, String(Math.ceil(f.hp)), `600 26px ${FONT}`, '#ffffff', 'rgba(3,8,18,.9)', 5, null, right ? 'right' : 'left');
-    // combo counter
-    if (f.combo >= 2 && f.comboT > 0){
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, f.comboT / 20);
-      const cx = right ? x + bw - 8 : x + 8, pop = 1 + Math.max(0, (f.comboT - 58)) * .02;
-      const sz = (40 + Math.min(f.combo, 9) * 3.4) * pop;
-      slant(cx, 148, String(f.combo), `700 ${sz * 1.5}px ${FONT}`, '#ffd85a', '#1a0a04', 9, '#ff8a2a', right ? 'right' : 'left');
-      slant(cx, 148 + sz * .52, 'HITS', `600 ${sz * .6}px ${FONT}`, '#ffffff', '#1a0a04', 6, null, right ? 'right' : 'left');
-      ctx.restore();
-    }
-  });
-  // timer plate
-  ctx.save();
-  bevelBox(W / 2 - 52, 14, 104, 58, 16);
-  ctx.fillStyle = 'rgba(4,10,22,.86)'; ctx.fill();
-  ctx.strokeStyle = '#3ce6ff'; ctx.lineWidth = 2.2; ctx.stroke();
-  ctx.restore();
-  const urgent = G.timer <= 10;
-  slant(W / 2, 62, String(Math.max(0, G.timer)), `600 50px ${FONT}`,
-    urgent && G.frame % 30 < 15 ? '#ff5a44' : '#eaf6ff', 'rgba(3,8,18,.9)', 6, urgent ? '#ff3a2a' : '#3ce6ff');
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = 'rgba(60,230,255,.25)'; ctx.fillRect(W / 2 - 52, 70, 104, 2);
+  ctx.strokeStyle = rage(f) > .68 ? '#ffc93c' : '#3ce6ff'; ctx.lineWidth = 2.5; ctx.stroke();
   ctx.restore();
 }
 
@@ -1912,7 +1919,6 @@ function camFocus(){
     }
     return best || live.slice(0, 1);
   }
-  if (G.rules === 'duel') return live;
   const me = G.f[G.myIdx];
   if (!me || me.gone) return live.slice(0, 1);
   const set = [me];
@@ -1971,7 +1977,7 @@ function drawOffscreen(){
     ctx.closePath();
     ctx.fillStyle = 'rgba(5,11,24,.92)'; ctx.fill();
     ctx.save(); ctx.clip();
-    drawHead(cx, cy + 3, 15, 0, 1, kit, f.energy >= 60, '#0a0812');
+    drawHead(cx, cy + 3, 15, 0, 1, kit, rage(f) > .68, '#0a0812');
     ctx.restore();
     ctx.strokeStyle = kit.gi; ctx.lineWidth = 2.5; ctx.stroke();
     const ang = Math.atan2(sy - cy, sx - cx);
@@ -1992,130 +1998,104 @@ function drawVignette(menu){
   ctx.restore();
 }
 
-// ---------- brawl HUD ----------
-// Twelve players will not fit two giant gauges, so your own bars sit bottom-left,
-// everyone else is a row on the right, and the map tells you where they all are.
-function drawSelfPanel(f){
-  const x = 20, y = H - 128, bw = 330;
-  const kit = KITOF(f);
-  drawPortrait(f, x + 34, y + 34, 30, 0);
-  slant(x + 74, y + 20, f.label.toUpperCase(), `600 24px ${FONT}`, '#e6f7ff', 'rgba(3,8,18,.9)', 4, null, 'left');
-  // health
-  ctx.save();
-  slab(x + 74, y + 28, bw - 74, 22, 12, false);
-  ctx.fillStyle = 'rgba(4,10,22,.82)'; ctx.fill();
-  ctx.save(); ctx.clip();
-  const cur = (bw - 74) * (f.hp / MAXHP), lag = (bw - 74) * (f.hpLag / MAXHP), low = f.hp / MAXHP < .28;
-  ctx.fillStyle = 'rgba(255,240,180,.85)'; ctx.fillRect(x + 74, y + 28, lag, 22);
-  const g = ctx.createLinearGradient(0, y + 28, 0, y + 50);
-  g.addColorStop(0, low ? '#ff9a6a' : shade(kit.gi, .55));
-  g.addColorStop(.45, low ? '#ff3a2a' : kit.gi);
-  g.addColorStop(1, low ? '#8d1409' : kit.giD);
-  ctx.fillStyle = g; ctx.fillRect(x + 74, y + 28, cur, 22);
-  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(x + 74, y + 30, cur, 6);
-  ctx.restore();
-  slab(x + 74, y + 28, bw - 74, 22, 12, false);
-  ctx.strokeStyle = '#3ce6ff'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.restore();
-  slant(x + 84, y + 46, String(Math.ceil(f.hp)), `600 22px ${FONT}`, '#ffffff', 'rgba(3,8,18,.9)', 5, null, 'left');
-  // ki stocks
-  const ew = bw - 74, ex = x + 74, ey = y + 56, eh = 12, segs = 5, gap = 4;
-  const sw = (ew - gap * (segs - 1)) / segs, full = f.energy >= 60;
-  for (let s = 0; s < segs; s++){
-    const sx = ex + s * (sw + gap);
-    slab(sx, ey, sw, eh, 6, false);
-    ctx.fillStyle = f.noInk > 0 && G.frame % 6 < 3 ? 'rgba(200,40,40,.5)' : 'rgba(4,10,22,.8)'; ctx.fill();
-    const k = clamp((f.energy - s * 20) / 20, 0, 1);
-    if (k > 0){
-      ctx.save(); ctx.clip();
-      const gg = ctx.createLinearGradient(0, ey, 0, ey + eh);
-      gg.addColorStop(0, full ? '#fff2b0' : '#bff4ff');
-      gg.addColorStop(.5, full ? '#ffc93c' : '#3ce6ff');
-      gg.addColorStop(1, full ? '#ff8a1e' : '#0d7fa8');
-      ctx.fillStyle = gg; ctx.fillRect(sx, ey, sw * k, eh);
-      ctx.restore();
-    }
-    slab(sx, ey, sw, eh, 6, false);
-    ctx.strokeStyle = full ? 'rgba(255,201,60,.9)' : 'rgba(60,230,255,.55)'; ctx.lineWidth = 1.5; ctx.stroke();
-  }
-  if (f.respawn > 0){
-    slant(x + 74, y + 92, `RESPAWNING IN ${Math.ceil(f.respawn / 60)}`, `600 22px ${FONT}`, '#ffc93c', 'rgba(3,8,18,.9)', 5, null, 'left');
-  }
+// ---------- HUD ----------
+// A panel per fighter along the bottom: portrait tab, name, the damage number
+// that decides how far the next hit sends them, stock pips and their weapon.
+function dmgColor(d){
+  const k = clamp(d / 220, 0, 1);
+  return `rgb(255,${Math.round(255 - k * 208)},${Math.round(255 - k * 248)})`;
 }
-
-function drawScoreboard(){
-  const rows = standings().slice(0, MAX_PLAYERS);
-  const bw = 232, x = W - bw - 16, y0 = 88, rh = 21;
-  ctx.save();
-  bevelBox(x, y0 - 6, bw, rows.length * rh + 14, 12);
-  ctx.fillStyle = 'rgba(4,10,22,.72)'; ctx.fill();
-  ctx.strokeStyle = 'rgba(60,230,255,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.restore();
+function drawPlayerStrip(){
+  const list = G.f.filter(f => !f.gone);
+  if (!list.length) return;
+  const n = list.length, gap = 5;
+  const pw = Math.min(150, (W - 40) / n);
+  const x0 = W / 2 - n * pw / 2, y = H - 74;
   const me = G.f[G.myIdx];
-  rows.forEach((f, i) => {
-    const y = y0 + 8 + i * rh;
-    if (f === me){ ctx.fillStyle = 'rgba(60,230,255,.14)'; ctx.fillRect(x + 4, y - 13, bw - 8, rh - 2); }
-    ctx.fillStyle = f.respawn > 0 ? hexA(f.color, .35) : f.color;
-    ctx.fillRect(x + 10, y - 11, 11, 11);
-    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.5; ctx.strokeRect(x + 10, y - 11, 11, 11);
-    ctx.font = `500 16px ${FONT2}`; ctx.textAlign = 'left';
-    ctx.fillStyle = f.respawn > 0 ? '#6d8296' : (f === me ? '#ffc93c' : '#d8ecfa');
-    ctx.fillText(f.label.slice(0, 14), x + 28, y);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `600 18px ${FONT}`;
-    ctx.fillText(String(f.score), x + bw - 34, y + 1);
-    ctx.fillStyle = 'rgba(160,190,210,.75)';
-    ctx.font = `500 13px ${FONT2}`;
-    ctx.fillText(String(f.deaths), x + bw - 12, y);
+  list.forEach((f, i) => {
+    const x = x0 + i * pw;
+    ctx.save();
+    ctx.globalAlpha = f.out ? .42 : 1;
+    bevelBox(x + gap / 2, y, pw - gap, 62, 10);
+    ctx.fillStyle = f === me ? 'rgba(10,30,54,.92)' : 'rgba(4,10,22,.84)'; ctx.fill();
+    ctx.strokeStyle = f === me ? '#ffc93c' : hexA(f.color, .7);
+    ctx.lineWidth = f === me ? 2.4 : 1.5; ctx.stroke();
+    ctx.fillStyle = f.color; ctx.fillRect(x + gap / 2 + 2, y + 3, 5, 56);
+    const nameSize = clamp(pw * .095, 9, 13);
+    ctx.font = `500 ${nameSize}px ${FONT2}`; ctx.textAlign = 'left';
+    ctx.fillStyle = f === me ? '#ffc93c' : '#cfe6f5';
+    ctx.fillText(f.label.slice(0, Math.max(5, (pw / 8.5) | 0)), x + gap / 2 + 12, y + 16);
+    // stocks
+    for (let s = 0; s < STOCKS; s++){
+      const sx = x + pw - gap / 2 - 10 - s * 11;
+      ctx.beginPath(); ctx.arc(sx, y + 12, 4.2, 0, TAU);
+      ctx.fillStyle = s < f.stocks ? f.color : 'rgba(255,255,255,.13)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+    // the number that matters
+    const big = clamp(pw * .25, 18, 32);
+    if (f.out) slant(x + pw / 2, y + 50, 'OUT', `700 ${big * .8}px ${FONT}`, '#7c8fa3', '#06101c', 5);
+    else if (f.respawn > 0) slant(x + pw / 2, y + 50, Math.ceil(f.respawn / 60) + '...', `700 ${big * .8}px ${FONT}`, '#9fd6ff', '#06101c', 5);
+    else {
+      const dc = dmgColor(f.dmg);
+      slant(x + pw / 2 + 8, y + 50, Math.round(f.dmg) + '%', `700 ${big}px ${FONT}`, dc, '#06101c', 5, f.dmg > 120 ? dc : null);
+    }
+    // what they are holding
+    if (f.weapon && !f.out){
+      ctx.save(); ctx.translate(x + gap / 2 + 18, y + 46); ctx.rotate(-.35);
+      drawWeaponShape(f.weapon, .40); ctx.restore();
+    }
+    ctx.restore();
   });
   ctx.textAlign = 'left';
 }
 
 function drawKillFeed(){
   ctx.save();
-  ctx.font = `500 15px ${FONT2}`; ctx.textAlign = 'left';
+  ctx.font = `500 15px ${FONT2}`; ctx.textAlign = 'right';
   G.feed.forEach((m, i) => {
     ctx.globalAlpha = clamp(m.life / 45, 0, 1);
-    ctx.fillStyle = 'rgba(4,10,22,.6)';
     const w = ctx.measureText(m.text).width + 18;
-    ctx.fillRect(16, 84 + i * 24, w, 20);
+    ctx.fillStyle = 'rgba(4,10,22,.6)';
+    ctx.fillRect(W - 16 - w, 16 + i * 24, w, 20);
     ctx.fillStyle = m.color;
-    ctx.fillText(m.text, 25, 99 + i * 24);
+    ctx.fillText(m.text, W - 25, 31 + i * 24);
   });
   ctx.restore();
+  ctx.textAlign = 'left';
 }
 
 function drawMinimap(){
-  const mw = 430, mh = 118, mx = W / 2 - mw / 2, my = H - mh - 14;
+  const mw = 300, mh = 82, mx = 18, my = 18;
   const ww = WORLD.x1 - WORLD.x0, wh = WORLD.y1 - WORLD.y0;
   const sx = mw / ww, sy = mh / wh;
   const px = x => mx + (x - WORLD.x0) * sx, py = y => my + (y - WORLD.y0) * sy;
   ctx.save();
-  bevelBox(mx - 6, my - 6, mw + 12, mh + 12, 12);
-  ctx.fillStyle = 'rgba(4,10,22,.72)'; ctx.fill();
-  ctx.strokeStyle = 'rgba(60,230,255,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+  bevelBox(mx - 6, my - 6, mw + 12, mh + 12, 10);
+  ctx.fillStyle = 'rgba(4,10,22,.7)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(60,230,255,.32)'; ctx.lineWidth = 1.4; ctx.stroke();
   ctx.save(); ctx.beginPath(); ctx.rect(mx - 4, my - 4, mw + 8, mh + 8); ctx.clip();
   for (const pl of PLATS){
-    ctx.fillStyle = pl.isle ? 'rgba(212,180,132,.95)' : 'rgba(130,225,250,.75)';
-    ctx.fillRect(px(pl.x), py(pl.y), Math.max(3, pl.w * sx), pl.isle ? 5 : 3);
+    ctx.fillStyle = pl.isle ? 'rgba(212,180,132,.95)' : 'rgba(130,225,250,.7)';
+    ctx.fillRect(px(pl.x), py(pl.y), Math.max(3, pl.w * sx), pl.isle ? 4 : 2.5);
   }
-  // what the camera can see right now
+  for (const w of G.wpns){
+    ctx.fillStyle = WEAPONS[w.kind].col;
+    ctx.fillRect(px(w.x) - 1.5, py(w.y) - 1.5, 3, 3);
+  }
   const v = G.view;
-  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
   ctx.strokeRect(px(v.x0), py(v.y0), (v.x1 - v.x0) * sx, (v.y1 - v.y0) * sy);
   const me = G.f[G.myIdx];
   for (const f of G.f){
-    if (f.gone) continue;
+    if (f.gone || f.out) continue;
     const dx = px(f.x), dy = py(f.y);
-    ctx.globalAlpha = f.respawn > 0 ? .35 : 1;
-    if (f === me){
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(dx, dy - 2, 6.5, 0, TAU); ctx.stroke();
-    }
+    ctx.globalAlpha = f.respawn > 0 ? .4 : 1;
+    if (f === me){ ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(dx, dy - 2, 5.5, 0, TAU); ctx.stroke(); }
     ctx.fillStyle = f.color;
-    ctx.beginPath(); ctx.arc(dx, dy - 2, 4, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(dx, dy - 2, 3.4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1.1; ctx.stroke();
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -2123,37 +2103,41 @@ function drawMinimap(){
 }
 
 function drawBrawlHUD(){
-  const me = G.f[G.myIdx];
-  if (me) drawSelfPanel(me);
-  drawScoreboard();
+  drawPlayerStrip();
   drawKillFeed();
   drawMinimap();
-  // clock
   ctx.save();
-  bevelBox(W / 2 - 52, 14, 104, 58, 16);
+  bevelBox(W / 2 - 52, 14, 104, 52, 14);
   ctx.fillStyle = 'rgba(4,10,22,.86)'; ctx.fill();
   ctx.strokeStyle = '#3ce6ff'; ctx.lineWidth = 2.2; ctx.stroke();
   ctx.restore();
   const urgent = G.timer <= 15;
   const mm = Math.floor(Math.max(0, G.timer) / 60), ss = Math.max(0, G.timer) % 60;
-  slant(W / 2, 62, `${mm}:${String(ss).padStart(2, '0')}`, `600 42px ${FONT}`,
+  slant(W / 2, 56, `${mm}:${String(ss).padStart(2, '0')}`, `600 38px ${FONT}`,
     urgent && G.frame % 30 < 15 ? '#ff5a44' : '#eaf6ff', 'rgba(3,8,18,.9)', 6, urgent ? '#ff3a2a' : '#3ce6ff');
   if (G.net.on && G.net.ping != null){
-    ctx.font = `500 13px ${FONT2}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(150,200,225,.8)';
-    ctx.fillText(`${G.net.ping} ms`, W / 2, 88);
-    ctx.textAlign = 'left';
+    ctx.font = `500 12px ${FONT2}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(150,200,225,.8)';
+    ctx.fillText(`${G.net.ping} ms`, W / 2, 80); ctx.textAlign = 'left';
   }
-  // your own combo, centred over your fighter's side of the screen
+  const me = G.f[G.myIdx];
   if (me && me.combo >= 2 && me.comboT > 0){
     ctx.save();
     ctx.globalAlpha = Math.min(1, me.comboT / 20);
-    const sz = 38 + Math.min(me.combo, 9) * 3.4;
-    slant(W / 2 - 250, 190, String(me.combo), `700 ${sz * 1.5}px ${FONT}`, '#ffd85a', '#1a0a04', 9, '#ff8a2a');
-    slant(W / 2 - 250, 190 + sz * .52, 'HITS', `600 ${sz * .6}px ${FONT}`, '#ffffff', '#1a0a04', 6);
+    const sz = 36 + Math.min(me.combo, 9) * 3.2;
+    slant(W / 2 - 260, 180, String(me.combo), `700 ${sz * 1.5}px ${FONT}`, '#ffd85a', '#1a0a04', 9, '#ff8a2a');
+    slant(W / 2 - 260, 180 + sz * .52, 'HITS', `600 ${sz * .6}px ${FONT}`, '#ffffff', '#1a0a04', 6);
     ctx.restore();
   }
+  // a quiet reminder of the four buttons for the first few seconds
+  if (G.phase === 'fight' && G.phaseT < 420 && !G.net.on){
+    ctx.save();
+    ctx.globalAlpha = clamp((420 - G.phaseT) / 120, 0, 1) * .75;
+    ctx.font = `500 15px ${FONT2}`; ctx.textAlign = 'center'; ctx.fillStyle = '#bfe4f7';
+    ctx.fillText('SPACE jump   ·   J or left click attack   ·   K heavy   ·   L dodge   ·   H throw', W / 2, H - 92);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
 }
-
 function render(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, W, H);
@@ -2194,23 +2178,15 @@ function render(){
   if (G.demo){ drawVignette(true); return; }
   drawVignette(false);
   drawOffscreen();
-  if (G.rules === 'duel') drawHUD(); else drawBrawlHUD();
+  drawBrawlHUD();
 
   if (G.phase === 'intro'){
-    if (G.rules === 'duel'){
-      const [a, b] = G.f, final = a.wins === 1 && b.wins === 1;
-      if (G.phaseT < 65) bigText(final ? 'FINAL ROUND' : `ROUND ${G.round}`, H / 2 - 40, 104, '#3ce6ff');
-      else bigText('FIGHT!', H / 2 - 40, 150, '#ff5a2a');
-    } else {
-      if (G.phaseT < 44) bigText(`${G.f.filter(f => !f.gone).length} FIGHTERS`, H / 2 - 40, 92, '#3ce6ff');
-      else bigText('BRAWL!', H / 2 - 40, 150, '#ff5a2a');
-    }
-  } else if (G.phase === 'ko'){
-    const w = G.f.find(f => f.state !== 'ko') || G.f[0];
-    bigText('K.O.', H / 2 - 40, 200, '#ffc93c', G.phaseT > 40 ? `${w.label} takes the round` : null);
-  } else if (G.phase === 'timeup'){
-    bigText('TIME UP', H / 2 - 40, 140, '#3ce6ff',
-      G.timeWinner ? `${G.timeWinner.label} ${G.rules === 'duel' ? 'had more health' : 'tops the board'}` : 'Dead even.');
+    const n = G.f.filter(f => !f.gone).length;
+    if (G.phaseT < 46) bigText(n > 2 ? `${n} FIGHTERS` : 'DUEL', H / 2 - 40, 96, '#3ce6ff');
+    else bigText('GO!', H / 2 - 40, 160, '#ff5a2a');
+  } else if (G.phase === 'done'){
+    bigText(G.winner ? 'WINNER' : 'DRAW', H / 2 - 60, 150, '#ffc93c',
+      G.winner ? `${G.winner.label} — ${G.winner.score} KO${G.winner.score === 1 ? '' : 's'}` : 'Nobody is left standing');
   }
 }
 // ---------- loop ----------
@@ -2226,9 +2202,9 @@ function loop(now){
 // Star network, same shape as the other games here: the host's browser is the
 // authority, every guest connects straight to it, sends inputs and gets snapshots.
 const ROOM_PREFIX = 'stickxv-v1-room-';
-const ACT = ['left','right','up','down','light','heavy','kick','special','dodge'];
+const ACT = ['left','right','up','down','light','heavy','dodge','throw'];
 const MOVE_KEYS = Object.keys(MOVES);
-const ST = ['idle','walk','air','attack','guard','hitstun','dodge','ko'];
+const ST = ['idle','walk','air','attack','hitstun','dodge','ko'];
 const SNAP_EVERY = 3;                 // host ships a snapshot every third frame
 
 const netEl = () => document.getElementById('net');
@@ -2270,7 +2246,7 @@ function renderLobby(){
   const btn = document.getElementById('beginBtn');
   btn.style.display = host ? '' : 'none';
   document.getElementById('lobbyHint').textContent = host
-    ? `Share the code. ${N.roster.length} of ${MAX_PLAYERS} in. Empty slots fill with bots up to ${G.botCount}.`
+    ? `Share the code. ${N.roster.length} of ${MAX_PLAYERS} in. Start whenever you are ready.`
     : `${N.roster.length} of ${MAX_PLAYERS} in. Waiting for the host to start.`;
 }
 
@@ -2319,7 +2295,7 @@ function guestJoined(c){
     sendTo(c, { t:'start', roster:fullRoster() });
     killFeed(`${name} joined`, '#8fd67a');
   }
-  netBroadcast({ t:'lobby', roster:N.roster });
+  netBroadcast({ t:'lobby', roster:G.mode === 'play' ? fullRoster() : N.roster });
   if (G.mode !== 'play') renderLobby();
 }
 function joinLive(idx, name){
@@ -2341,7 +2317,7 @@ function guestLeft(g){
   const f = G.f[g.idx];
   if (f){ f.gone = true; f.respawn = 0; }
   if (G.mode === 'play') killFeed(`${g.name} left`, '#9fb4c8');
-  netBroadcast({ t:'lobby', roster:N.roster });
+  netBroadcast({ t:'lobby', roster:G.mode === 'play' ? fullRoster() : N.roster });
   if (G.mode !== 'play') renderLobby();
 }
 function onHostData(g, d){
@@ -2361,14 +2337,16 @@ function fullRoster(){
 // host kicks off the match: humans first, bots to fill up to the chosen size
 function netStartMatch(){
   const N = G.net;
+  // only the people who actually joined: empty slots stay empty
   const top = Math.max(0, ...N.roster.map(r => r.idx));
   const list = [];
-  for (let i = 0; i <= Math.max(top, G.botCount - 1); i++){
+  for (let i = 0; i <= top; i++){
     const r = N.roster.find(x => x.idx === i);
     list.push(r ? { name:r.name, kit:r.kit, local:i === 0, pad:i === 0 ? MAP_SOLO : null }
-                : { name:BOT_NAMES[(i - 1 + BOT_NAMES.length) % BOT_NAMES.length], kit:i % KITS.length, ai:G.diff });
+                : { name:'-', kit:i % KITS.length, empty:true });
   }
-  setupMatch({ rules:'ffa', diff:G.diff, myIdx:0, roster:list });
+  setupMatch({ rules:'brawl', diff:G.diff, myIdx:0, roster:list });
+  list.forEach((r, i) => { if (r.empty) G.f[i].gone = true; });
   netBroadcast({ t:'start', roster:fullRoster() });
   beginPlay();
 }
@@ -2409,12 +2387,30 @@ function onGuestData(d){
   if (!d || typeof d !== 'object') return;
   const N = G.net;
   if (d.t === 'welcome'){ N.myIdx = d.idx; G.myIdx = d.idx; if (d.code) N.code = d.code; }
-  else if (d.t === 'lobby'){ N.roster = Array.isArray(d.roster) ? d.roster : []; if (G.mode !== 'play') renderLobby(); }
+  else if (d.t === 'lobby'){
+    N.roster = Array.isArray(d.roster) ? d.roster : [];
+    if (G.mode === 'play') ensureFighters(N.roster); else renderLobby();
+  }
   else if (d.t === 'full'){ netLeave(); toMenu(); setNet(`That room is full (${MAX_PLAYERS} players).`, true); }
   else if (d.t === 'start') guestStart(d.roster);
   else if (d.t === 'pong'){ N.ping = Math.round(performance.now() - N.pingAt); }
   else if (d.t === 'snap') applySnap(d);
   else if (d.t === 'over') guestOver(d.rank);
+}
+// a guest may learn about a fighter it has never seen: build them a slot
+function ensureFighters(full){
+  for (const r of full){
+    if (typeof r.idx !== 'number' || r.idx < 0 || r.idx >= MAX_PLAYERS) continue;
+    while (G.f.length <= r.idx){
+      const filler = makeFighter(G.f.length, G.f.length % KITS.length, 'P' + (G.f.length + 1));
+      filler.gone = true; G.f.push(filler);
+    }
+    const f = G.f[r.idx];
+    f.label = String(r.name || f.label).slice(0, 12);
+    f.kit = (r.kit | 0) % KITS.length;
+    f.color = KITS[f.kit].gi;
+    f.gone = false;
+  }
 }
 function guestStart(roster){
   const N = G.net;
@@ -2427,7 +2423,7 @@ function guestStart(roster){
     list.push({ name:r ? r.name : 'P' + (i + 1), kit:r ? r.kit : i % KITS.length,
       local:i === N.myIdx, pad:i === N.myIdx ? MAP_SOLO : null });
   }
-  setupMatch({ rules:'ffa', diff:G.diff, myIdx:N.myIdx, roster:list });
+  setupMatch({ rules:'brawl', diff:G.diff, myIdx:N.myIdx, roster:list });
   for (let i = 0; i <= top; i++) if (!full.find(x => x.idx === i) && i !== N.myIdx) G.f[i].gone = true;
   beginPlay();
 }
@@ -2454,11 +2450,14 @@ function snapshot(){
     f:G.f.map(f => f.gone ? 0 : [
       f.idx, Math.round(f.x), Math.round(f.y), f.facing, ST.indexOf(f.state),
       f.move ? MOVE_KEYS.indexOf(f.moveName) : -1, Math.min(255, f.moveT),
-      Math.round(f.hp), Math.round(f.energy), f.score, f.deaths, f.respawn,
+      Math.round(f.dmg), f.stocks, f.score, f.deaths, f.respawn,
       Math.round(f.walkPh * 8) % 128, Math.round(f.vx), Math.round(f.vy), f.combo,
-      (f.onGround ? 1 : 0) | (f.inv > 0 ? 2 : 0) | (f.dodgeInv ? 4 : 0) | (f.flash > 0 ? 8 : 0)
+      (f.onGround ? 1 : 0) | (f.inv > 0 ? 2 : 0) | (f.dodgeInv ? 4 : 0) | (f.flash > 0 ? 8 : 0) | (f.out ? 16 : 0),
+      f.weapon ? WPN_KEYS.indexOf(f.weapon) : -1
     ]),
-    p:G.proj.map(pj => [Math.round(pj.x), Math.round(pj.y), Math.round(pj.vx), pj.r, pj.owner.idx, pj.big ? 1 : 0]),
+    p:G.proj.map(pj => [Math.round(pj.x), Math.round(pj.y), Math.round(pj.vx), pj.r, pj.owner.idx,
+      pj.big ? 1 : 0, pj.thrown ? WPN_KEYS.indexOf(pj.thrown) : -1]),
+    w:G.wpns.map(w => [Math.round(w.x), Math.round(w.y), WPN_KEYS.indexOf(w.kind), Math.round(w.life)]),
     fd:G.feed.map(m => [m.text, m.color, m.life]),
     ev:G.ev.splice(0)
   };
@@ -2478,6 +2477,9 @@ function playEvents(list){
     else if (k === 2){ ring(x, y, col, 150); inkBurst(x, y, 0, col, 26); flashScreen(.2); G.shake = Math.max(G.shake, 14); }
     else if (k === 3){ ring(x, y, col, b ? 90 : 52); Snd.play('blast', b ? 1.3 : .8); }
     else if (k === 4){ ring(x, y, '#8df0ff', 48); spark(x, y, 12); Snd.play('block'); }
+    else if (k === 5){ const wc = WEAPONS[WPN_KEYS[b]] || WEAPONS.sword;
+      ring(x, y, wc.col, 90); inkBurst(x, y, 0, wc.col, 10); Snd.play('jump'); }
+    else if (k === 6){ Snd.play('whoosh', 1.1); }
   }
 }
 function applySnap(d){
@@ -2489,15 +2491,21 @@ function applySnap(d){
   for (const row of d.f || []){
     if (!row){ continue; }
     const i = row[0];
-    if (i >= G.f.length) continue;
+    if (i < 0 || i >= MAX_PLAYERS) continue;
+    while (G.f.length <= i){
+      const filler = makeFighter(G.f.length, G.f.length % KITS.length, 'P' + (G.f.length + 1));
+      filler.gone = true; G.f.push(filler);
+    }
     const f = G.f[i];
     if (!f) continue;
     f.gone = false;
     const st = ST[row[4]] || 'idle';
     const mv = row[5] >= 0 ? MOVE_KEYS[row[5]] : '';
-    f.hp = row[7]; f.energy = row[8]; f.score = row[9]; f.deaths = row[10]; f.respawn = row[11];
+    f.dmg = row[7]; f.stocks = row[8]; f.score = row[9]; f.deaths = row[10]; f.respawn = row[11];
     f.combo = row[15]; f.comboT = row[15] >= 2 ? 40 : 0;
     const fl = row[16];
+    f.out = !!(fl & 16);
+    f.weapon = row[17] >= 0 ? WPN_KEYS[row[17]] : null;
     if (i === G.myIdx){
       // our own fighter is predicted locally; nudge it back rather than snapping
       const dx = row[1] - f.x, dy = row[2] - f.y;
@@ -2524,8 +2532,11 @@ function applySnap(d){
   G.f.forEach((f, i) => { if (!seen.has(i)) f.gone = true; });
   G.proj = (d.p || []).map(p => {
     const owner = G.f[p[4]] || G.f[0];
-    return { x:p[0], y:p[1], vx:p[2], r:p[3], owner, big:!!p[5], age:(G.frame >> 1) & 255, life:9, trail:[] };
+    return { x:p[0], y:p[1], vx:p[2], r:p[3], owner, big:!!p[5],
+      thrown:p[6] >= 0 ? WPN_KEYS[p[6]] : null, age:(G.frame >> 1) & 255, life:9, trail:[] };
   });
+  G.wpns = (d.w || []).map(w => ({ x:w[0], y:w[1], kind:WPN_KEYS[w[2]] || 'sword', life:w[3],
+    ph:(G.frame * .06) % 6.28, rest:true }));
   G.feed = (d.fd || []).map(m => ({ text:String(m[0]).slice(0, 48), color:m[1], life:m[2] }));
   playEvents(d.ev);
 }
@@ -2544,8 +2555,8 @@ function netLerp(f){
   if (fast && G.frame % 2 === 0) f.trail.push({ x:f.x, y:f.y, pose:f.drawPose.slice(), facing:f.facing, life:12 });
   for (const t of f.trail) t.life--;
   f.trail = f.trail.filter(t => t.life > 0);
-  f.auraT = f.energy >= 60 ? Math.min(30, f.auraT + 1) : Math.max(0, f.auraT - 1);
-  if (f.hpLag > f.hp) f.hpLag = Math.max(f.hp, f.hpLag - .5); else f.hpLag = f.hp;
+  f.auraT = rage(f) > .55 ? Math.min(30, f.auraT + 1) : Math.max(0, f.auraT - 1);
+  f.dmgLag += (f.dmg - f.dmgLag) * .25;
 }
 // called once per tick from the loop
 function netPump(){
@@ -2611,7 +2622,7 @@ function startBots(n){
   netLeave();
   const roster = [{ name:myName(), kit:0, local:true, pad:MAP_SOLO }];
   for (let i = 1; i < n; i++) roster.push({ name:BOT_NAMES[(i - 1) % BOT_NAMES.length], kit:i % KITS.length, ai:G.diff });
-  setupMatch({ rules:'ffa', diff:G.diff, myIdx:0, roster });
+  setupMatch({ rules:'brawl', diff:G.diff, myIdx:0, roster });
   beginPlay();
 }
 function toMenu(){
@@ -2619,7 +2630,7 @@ function toMenu(){
   G.mode = 'menu'; G.paused = false; keys.clear();
   const roster = [];
   for (let i = 0; i < 6; i++) roster.push({ name:BOT_NAMES[i], kit:(i * 2 + 1) % KITS.length, ai:'normal' });
-  setupMatch({ rules:'ffa', demo:true, diff:'normal', myIdx:-1, roster });
+  setupMatch({ rules:'brawl', demo:true, diff:'normal', myIdx:-1, roster });
   showOverlay('menu');
 }
 function restart(){
@@ -2628,7 +2639,7 @@ function restart(){
     else { G.mode = 'menu'; showOverlay('lobby'); renderLobby(); }
     return;
   }
-  if (G.rules === 'duel') startDuel(G.pvp); else startBots(G.f.length);
+  if (G.rules === 'duel') startDuel(G.pvp); else startBots(G.f.filter(f => !f.gone).length);
 }
 document.addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
@@ -2665,7 +2676,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildBackg
 requestAnimationFrame(loop);
 
 // exposed for testing only
-window.__stickXV = window.__inkBrawl = { G, tick, MOVES, KITS, PLATS, WORLD, startBots, startDuel };
+window.__stickXV = window.__inkBrawl = { G, tick, MOVES, KITS, PLATS, WORLD, WEAPONS, startBots, startDuel, applyHit };
 })();
 </script>
 </body>
