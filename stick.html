@@ -282,34 +282,33 @@ const KITS = [
 ];
 
 // ---------- the world ----------
-// A chain of floating islands rather than one arena, roughly five screens wide
-// and three tall, so twelve fighters have somewhere to go.
-const WORLD = { x0:-140, x1:4340, y0:-620, y1:1580 };
+// One screen, no scrolling. The arena is sized so the camera can hold all of it
+// at once, and the blast zones sit just past the edge of what you can see.
+const WORLD = { x0:-40, x1:2200, y0:-80, y1:1120 };
 const ISLES = [
-  { x:180,  y:980,  w:560 },
-  { x:900,  y:840,  w:520 },
-  { x:1620, y:1000, w:900 },
-  { x:2700, y:840,  w:520 },
-  { x:3400, y:980,  w:560 },
+  { x:100,  y:760, w:340 },
+  { x:600,  y:860, w:900 },
+  { x:1660, y:760, w:340 },
 ];
 const LEDGES = [
-  { x:400,  y:750, w:210 }, { x:730,  y:545, w:190 },
-  { x:1080, y:680, w:210 }, { x:1390, y:520, w:220 },
-  { x:1760, y:780, w:240 }, { x:2030, y:400, w:250 },
-  { x:2250, y:630, w:230 }, { x:2420, y:780, w:240 },
-  { x:2880, y:680, w:210 }, { x:3040, y:420, w:210 },
-  { x:3240, y:545, w:220 }, { x:3630, y:750, w:210 },
+  { x:250,  y:560, w:200 }, { x:560,  y:430, w:210 },
+  { x:900,  y:580, w:280 }, { x:1290, y:430, w:210 },
+  { x:1600, y:560, w:200 }, { x:760,  y:260, w:190 },
+  { x:1190, y:260, w:190 },
 ];
 const PLATS = ISLES.map(i => ({ x:i.x, y:i.y, w:i.w, soft:false, isle:true }))
   .concat(LEDGES.map(l => ({ x:l.x, y:l.y, w:l.w, soft:true })));
-// Where fighters drop in. Spread across the islands so a full room does not stack up.
 const SPAWNS = [
-  [330, 980], [560, 980], [1010, 840], [1250, 840], [1760, 1000], [1990, 1000],
-  [2230, 1000], [2450, 1000], [2810, 840], [3050, 840], [3550, 980], [3790, 980],
+  [200, 760], [350, 760], [700, 860], [900, 860], [1100, 860], [1300, 860],
+  [1750, 760], [1900, 760], [350, 560], [1700, 560], [850, 260], [1285, 260],
 ];
-// Kept for the duel modes, which still fight over the middle island.
-const STAGE = { x:ISLES[2].x, y:ISLES[2].y, w:ISLES[2].w };
-const OUT = { x0:WORLD.x0 - 240, x1:WORLD.x1 + 240, yb:WORLD.y1 + 300, yt:WORLD.y0 - 520 };
+const STAGE = { x:ISLES[1].x, y:ISLES[1].y, w:ISLES[1].w };
+// the fixed camera, worked out once from the arena it has to hold
+const CAM_Z = Math.min(W / (WORLD.x1 - WORLD.x0), H / (WORLD.y1 - WORLD.y0));
+const CAM_C = { x:(WORLD.x0 + WORLD.x1) / 2, y:(WORLD.y0 + WORLD.y1) / 2 };
+const VIEW_W = W / CAM_Z, VIEW_H = H / CAM_Z;
+const OUT = { x0:CAM_C.x - VIEW_W / 2 - 34, x1:CAM_C.x + VIEW_W / 2 + 34,
+              yb:CAM_C.y + VIEW_H / 2 + 46, yt:CAM_C.y - VIEW_H / 2 - 150 };
 
 // true while this fighter has some platform under them and is not way out past it
 function overGround(f){
@@ -333,7 +332,10 @@ function nearestPlat(x, y){
 const STOCKS = 3, DMG_MAX = 999;
 const KB_PER_DMG = .0132;              // how fast knockback grows as damage climbs
 const UNARMED_SIG = .55;               // signatures without a weapon are a shadow of the real thing
-const WPN_MAX = 6, WPN_EVERY = 230;    // weapons on the map at once, and frames between drops
+// A full room strips the map bare, so both the cap and the drop rate follow
+// the number of fighters still in the match.
+const wpnCap = () => clamp(2 + (G.f.filter(f => !f.gone && !f.out).length >> 1), 3, 8);
+const wpnEvery = () => clamp(300 - G.f.filter(f => !f.gone && !f.out).length * 13, 110, 300);
 
 const WEAPONS = {
   sword:    { name:'Sword',    col:'#dcecff', edge:'#8fb8e8', dmg:1.05, kb:1.02, reach:1.10, spd:1.10 },
@@ -357,7 +359,7 @@ const wpnOf = f => f.weapon ? WEAPONS[f.weapon] : null;
 const reachOf = f => f.weapon ? WEAPONS[f.weapon].reach : 1;
 
 function spawnWeapon(){
-  if (G.wpns.length >= WPN_MAX) return;
+  if (G.wpns.length >= wpnCap()) return;
   const pl = PLATS[Math.random() * PLATS.length | 0];
   const kind = WPN_KEYS[Math.random() * WPN_KEYS.length | 0];
   G.wpns.push({ kind, x:pl.x + 40 + Math.random() * Math.max(20, pl.w - 80), y:pl.y - 26,
@@ -365,7 +367,7 @@ function spawnWeapon(){
   ring(G.wpns[G.wpns.length - 1].x, G.wpns[G.wpns.length - 1].y, WEAPONS[kind].col, 70);
 }
 function updateWeapons(){
-  if (G.phase === 'fight' && ++G.wpnT >= WPN_EVERY){ G.wpnT = 0; spawnWeapon(); }
+  if (G.phase === 'fight' && ++G.wpnT >= wpnEvery()){ G.wpnT = 0; spawnWeapon(); }
   for (const w of G.wpns){
     w.ph += .06; w.life--;
     if (!w.rest){
@@ -1050,7 +1052,7 @@ function ringOut(f){
     checkMatchEnd();
   } else {
     const sp = respawnSpot(f);
-    f.x = sp[0]; f.y = sp[1] - 300;
+    f.x = sp[0]; f.y = sp[1] - 210;
     f.respawn = RESPAWN;
   }
 }
@@ -1140,9 +1142,10 @@ function startBrawl(){
     f.score = 0; f.deaths = 0; f.stocks = STOCKS; f.out = false; f.weapon = null;
     if (f.ai) f.ai = new AI(f.aiLevel || G.diff);
   });
-  G.proj = []; G.feed = []; G.wpns = []; G.wpnT = WPN_EVERY - 90; G.winner = null;
+  G.proj = []; G.feed = []; G.wpns = []; G.wpnT = 0; G.winner = null;
   G.phase = 'intro'; G.phaseT = 0; G.timer = MATCH_TIME; G.timerTick = 0; G.slow = 0;
-  for (let k = 0; k < 3; k++) spawnWeapon();
+  // start with the map already stocked so nobody opens the match empty-handed
+  for (let k = 0, n = wpnCap(); k < n; k++) spawnWeapon();
 }
 // alive first, then stocks left, then knockouts, then least damage taken
 function standings(){
@@ -1206,7 +1209,7 @@ function tick(){
     if (f.respawn > 0){
       if (!guest && --f.respawn <= 0){
         const sp = respawnSpot(f);
-        resetFighter(f, sp[0], sp[1] - 280, 1);
+        resetFighter(f, sp[0], sp[1] - 200, 1);
         f.state = 'air'; f.inv = 120;
         ring(sp[0], sp[1] - 70, KICOL(f), 150); inkBurst(sp[0], sp[1] - 70, 0, KICOL(f), 14);
       }
@@ -1382,7 +1385,7 @@ function drawSky(px, py){
 // Every island is the same silhouette scaled to its width: flat on top, tapering
 // to a broken point underneath so it reads as a torn-off chunk of land.
 function islePoly(s){
-  const d = s.w * .22;
+  const d = Math.min(s.w * .22, 165);
   return [[s.x, s.y], [s.x + s.w, s.y],
     [s.x + s.w - d * .17, s.y + d * .34], [s.x + s.w - d * .66, s.y + d * .62],
     [s.x + s.w * .6, s.y + d * .86], [s.x + s.w * .45, s.y + d],
@@ -1905,90 +1908,15 @@ function bigText(txt, y, size, color, sub){
   ctx.restore();
 }
 
-// What the camera should keep in frame. A duel frames both fighters; a brawl
-// rides with you and picks up whoever is close enough to matter.
-function camFocus(){
-  const live = G.f.filter(inPlay);
-  if (!live.length) return G.f.slice(0, 2);
-  if (G.demo){
-    // spectator: sit on whichever two fighters are closest to each other
-    let best = null, bd = Infinity;
-    for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++){
-      const d = Math.hypot(live[i].x - live[j].x, live[i].y - live[j].y);
-      if (d < bd){ bd = d; best = [live[i], live[j]]; }
-    }
-    return best || live.slice(0, 1);
-  }
-  const me = G.f[G.myIdx];
-  if (!me || me.gone) return live.slice(0, 1);
-  const set = [me];
-  for (const q of live) if (q !== me && Math.abs(q.x - me.x) < 560 && Math.abs(q.y - me.y) < 330) set.push(q);
-  return set;
-}
+// The whole arena, always. Nothing to follow, nothing to chase.
 function updateCam(){
   const cam = G.cam;
-  const set = camFocus();
-  let tz = 1, tx = cam.x, ty = cam.y;
-  if (set.length){
-    const minX = Math.min(...set.map(f => f.x)) - 200, maxX = Math.max(...set.map(f => f.x)) + 200;
-    const minY = Math.min(...set.map(f => f.y)) - 300, maxY = Math.max(...set.map(f => f.y)) + 90;
-    tz = clamp(Math.min(W / (maxX - minX), H / (maxY - minY)), .62, 1.3);
-    tx = (minX + maxX) / 2; ty = (minY + maxY) / 2;
-  }
-  cam.z += (tz - cam.z) * .07;
+  cam.z = CAM_Z; cam.zz = CAM_Z;
+  cam.x = CAM_C.x; cam.y = CAM_C.y;
   G.zoom *= .88;
-  const z = cam.z + G.zoom;
-  const hw = W / 2 / z, hh = H / 2 / z;
-  const lox = Math.min(WORLD.x0 + hw, WORLD.x1 - hw), hix = Math.max(WORLD.x0 + hw, WORLD.x1 - hw);
-  const loy = Math.min(WORLD.y0 + hh, WORLD.y1 - hh), hiy = Math.max(WORLD.y0 + hh, WORLD.y1 - hh);
-  cam.x += (clamp(tx, lox, hix) - cam.x) * .13;
-  cam.y += (clamp(ty, loy, hiy) - cam.y) * .13;
-  cam.x = clamp(cam.x, lox, hix); cam.y = clamp(cam.y, loy, hiy);
-  cam.zz = z;
-  G.view = { x0:cam.x - hw, y0:cam.y - hh, x1:cam.x + hw, y1:cam.y + hh };
+  G.view = { x0:cam.x - VIEW_W / 2, y0:cam.y - VIEW_H / 2, x1:cam.x + VIEW_W / 2, y1:cam.y + VIEW_H / 2 };
 }
 
-function drawOffscreen(){
-  const cam = G.cam, z = cam.zz || cam.z, me = G.f[G.myIdx];
-  // with twelve fighters most of them are off-screen most of the time, so only the
-  // five closest get a marker and they are nudged apart so they cannot stack up
-  const off = [];
-  for (const f of G.f){
-    if (!inPlay(f) || f === me) continue;
-    const sx = (f.x - cam.x) * z + W / 2, sy = (f.y - 75 - cam.y) * z + H / 2;
-    if (sx > 0 && sx < W && sy > 0 && sy < H) continue;
-    off.push({ f, sx, sy, d:Math.hypot(f.x - cam.x, f.y - cam.y) });
-  }
-  off.sort((a, b) => a.d - b.d);
-  const placed = [];
-  for (const o of off.slice(0, 5)){
-    const f = o.f, sx = o.sx, sy = o.sy;
-    let cx = clamp(sx, 56, W - 56), cy = clamp(sy, 150, H - 150);
-    for (const p of placed){
-      if (Math.hypot(cx - p[0], cy - p[1]) < 58){ cy = clamp(p[1] + 58, 150, H - 150); }
-    }
-    placed.push([cx, cy]);
-    const kit = KITOF(f);
-    const far = o.d > 1600;
-    ctx.save();
-    ctx.globalAlpha = far ? .5 : 1;
-    ctx.beginPath();
-    for (let k = 0; k < 6; k++){ const a = k / 6 * TAU - Math.PI / 2; ctx.lineTo(cx + Math.cos(a) * 26, cy + Math.sin(a) * 26); }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(5,11,24,.92)'; ctx.fill();
-    ctx.save(); ctx.clip();
-    drawHead(cx, cy + 3, 15, 0, 1, kit, rage(f) > .68, '#0a0812');
-    ctx.restore();
-    ctx.strokeStyle = kit.gi; ctx.lineWidth = 2.5; ctx.stroke();
-    const ang = Math.atan2(sy - cy, sx - cx);
-    ctx.fillStyle = kit.gi;
-    poly([[cx + Math.cos(ang) * 40, cy + Math.sin(ang) * 40],
-      [cx + Math.cos(ang + .4) * 26, cy + Math.sin(ang + .4) * 26],
-      [cx + Math.cos(ang - .4) * 26, cy + Math.sin(ang - .4) * 26]]);
-    ctx.fill();
-    ctx.restore();
-  }
-}
 function drawVignette(menu){
   ctx.save();
   const g = ctx.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .92);
@@ -2065,47 +1993,9 @@ function drawKillFeed(){
   ctx.textAlign = 'left';
 }
 
-function drawMinimap(){
-  const mw = 300, mh = 82, mx = 18, my = 18;
-  const ww = WORLD.x1 - WORLD.x0, wh = WORLD.y1 - WORLD.y0;
-  const sx = mw / ww, sy = mh / wh;
-  const px = x => mx + (x - WORLD.x0) * sx, py = y => my + (y - WORLD.y0) * sy;
-  ctx.save();
-  bevelBox(mx - 6, my - 6, mw + 12, mh + 12, 10);
-  ctx.fillStyle = 'rgba(4,10,22,.7)'; ctx.fill();
-  ctx.strokeStyle = 'rgba(60,230,255,.32)'; ctx.lineWidth = 1.4; ctx.stroke();
-  ctx.save(); ctx.beginPath(); ctx.rect(mx - 4, my - 4, mw + 8, mh + 8); ctx.clip();
-  for (const pl of PLATS){
-    ctx.fillStyle = pl.isle ? 'rgba(212,180,132,.95)' : 'rgba(130,225,250,.7)';
-    ctx.fillRect(px(pl.x), py(pl.y), Math.max(3, pl.w * sx), pl.isle ? 4 : 2.5);
-  }
-  for (const w of G.wpns){
-    ctx.fillStyle = WEAPONS[w.kind].col;
-    ctx.fillRect(px(w.x) - 1.5, py(w.y) - 1.5, 3, 3);
-  }
-  const v = G.view;
-  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
-  ctx.strokeRect(px(v.x0), py(v.y0), (v.x1 - v.x0) * sx, (v.y1 - v.y0) * sy);
-  const me = G.f[G.myIdx];
-  for (const f of G.f){
-    if (f.gone || f.out) continue;
-    const dx = px(f.x), dy = py(f.y);
-    ctx.globalAlpha = f.respawn > 0 ? .4 : 1;
-    if (f === me){ ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.arc(dx, dy - 2, 5.5, 0, TAU); ctx.stroke(); }
-    ctx.fillStyle = f.color;
-    ctx.beginPath(); ctx.arc(dx, dy - 2, 3.4, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1.1; ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-  ctx.restore();
-  ctx.restore();
-}
-
 function drawBrawlHUD(){
   drawPlayerStrip();
   drawKillFeed();
-  drawMinimap();
   ctx.save();
   bevelBox(W / 2 - 52, 14, 104, 52, 14);
   ctx.fillStyle = 'rgba(4,10,22,.86)'; ctx.fill();
@@ -2177,7 +2067,6 @@ function render(){
 
   if (G.demo){ drawVignette(true); return; }
   drawVignette(false);
-  drawOffscreen();
   drawBrawlHUD();
 
   if (G.phase === 'intro'){
@@ -2306,7 +2195,7 @@ function joinLive(idx, name){
   const f = makeFighter(idx, idx % KITS.length, name);
   const sp = respawnSpot(f);
   G.f[idx] = f;
-  resetFighter(f, sp[0], sp[1] - 280, 1);
+  resetFighter(f, sp[0], sp[1] - 200, 1);
   f.state = 'air'; f.inv = 100;
 }
 function guestLeft(g){
