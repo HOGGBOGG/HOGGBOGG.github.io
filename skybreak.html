@@ -30,10 +30,13 @@
     * "Play vs bots" runs the authoritative server in your own tab, connected
       through the network simulator. It is a faithful model of an online
       match, not an online match.
-    * Online play is peer-to-peer WebRTC with the host's tab as the server.
-      There is no signalling server (invite/reply codes are copied by hand),
-      no TURN relay (strict NATs may fail to connect), and the host is trusted
-      the way any listen server is. A dedicated server would run the same
+    * Online play uses the host's tab as the server. Guests join with a room
+      code; packets travel over a TLS WebSocket through free public MQTT
+      brokers (works where peer-to-peer is blocked), and switch to a direct
+      WebRTC link automatically when both networks allow it. The relay adds
+      latency and is a shared public service (?relay=wss://your-broker/mqtt
+      in the URL uses your own broker instead). The host is trusted the way
+      any listen server is. A dedicated server would run the same
       AuthoritativeServer class under Node behind a WebSocket transport.
 -->
 <style>
@@ -114,6 +117,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .dimtxt { color: var(--dim); font-size: 12.5px; }
 .status { font-size: 13px; margin: 8px 0; min-height: 1.4em; color: var(--accent); }
 .status.bad { color: var(--bad); }
+.roomcode { display: flex; align-items: center; gap: 12px; margin: 8px 0 2px; }
+#room-code { font: 900 36px/1 var(--mono); letter-spacing: .22em; color: var(--accent); user-select: all; }
+.codein { font: 800 26px/1.2 var(--mono) !important; letter-spacing: .3em; text-transform: uppercase; text-align: center; }
+details.adv { margin: 12px 0 4px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.adv summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+details.adv[open] summary { margin-bottom: 8px; }
 
 /* ---------- results ---------- */
 table.results { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 14px; }
@@ -190,8 +199,8 @@ body.probe-open #debug { max-height: calc(100vh - 330px); }
     <h1 class="logo">SKYBREAK</h1>
     <div class="tagline">Aerial brawl · netcode lab</div>
     <button class="btn primary" data-go="lobby">Play vs bots<small>Up to 12 fighters, against a local authoritative server with simulated latency</small></button>
-    <button class="btn" data-go="host">Host online match<small>Your browser runs the server; friends join over WebRTC</small></button>
-    <button class="btn" data-go="join">Join online match<small>Paste an invite code from the host</small></button>
+    <button class="btn" data-go="host">Host online match<small>Your browser runs the server; friends join with a room code</small></button>
+    <button class="btn" data-go="join">Join online match<small>Type the host's 6-character room code</small></button>
     <button class="btn" data-go="controls">Controls</button>
     <p class="note touchnote">Skybreak is played with a keyboard or a gamepad. On a touch-only device you can watch, but not play.</p>
     <p class="dimtxt" style="margin-top:14px">Your inputs are simulated on the frame you press them; the server confirms later and corrections are smoothed. Press <kbd>F3</kbd> in a match to watch it happen.</p>
@@ -231,17 +240,22 @@ body.probe-open #debug { max-height: calc(100vh - 330px); }
 <section id="scr-host" class="overlay dock">
   <div class="card" style="margin:52px 0 0 0;width:min(430px,100%)">
     <h2>Host an online match</h2>
-    <p>Your tab is the authoritative server. Invite each friend with a code, paste back their reply, then start. You can move around while you wait.</p>
-    <button class="btn" data-act="invite">Create invite code</button>
-    <div id="host-invites"></div>
+    <p>Your tab runs the server. Give friends the room code: they choose <b>Join online match</b> and type it. You can move around while you wait.</p>
+    <div class="roomcode"><span id="room-code" aria-live="polite">······</span><button class="btn inline" data-act="copy-code">Copy</button></div>
+    <div class="status" id="relay-status">Opening the room…</div>
     <div class="field"><label>Players</label><ul class="roster" id="host-roster"></ul></div>
     <div class="row">
       <div class="field"><label>Fill with bots up to</label><div class="seg" id="seg-fill"><button data-v="0">None</button><button data-v="4">4</button><button data-v="8">8</button><button data-v="12">12</button></div></div>
       <div class="field"><label>Stocks</label><div class="seg" id="seg-host-stocks"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     </div>
     <button class="btn primary" data-act="host-start">Start match</button>
-    <button class="btn" data-act="leave">Close server</button>
-    <div class="note">No signalling server is used: codes are exchanged by hand (chat, email). Connections use public STUN only, with no TURN relay, so two players on strict/symmetric NATs may be unable to connect.</div>
+    <button class="btn" data-act="leave">Close room</button>
+    <div class="note">Online traffic goes through a free public relay over a secure WebSocket, so it works on office and school networks that block peer-to-peer. If both sides allow a direct link, the game switches to it automatically for lower latency.</div>
+    <details class="adv"><summary>Relays blocked too? Connect with manual codes</summary>
+      <p class="dimtxt">A direct WebRTC link with no relay: send each friend an invite code and paste back their reply. This needs peer-to-peer to work on both networks.</p>
+      <button class="btn" data-act="invite">Create invite code</button>
+      <div id="host-invites"></div>
+    </details>
   </div>
 </section>
 
@@ -251,12 +265,16 @@ body.probe-open #debug { max-height: calc(100vh - 330px); }
     <h2>Join an online match</h2>
     <div class="field"><label for="in-name-join">Your name</label><input id="in-name-join" type="text" maxlength="14" autocomplete="off" spellcheck="false"></div>
     <div class="field"><label>Your colour</label><div class="swatches" id="sw-join"></div></div>
-    <div class="field"><label for="in-offer">1 · Paste the host's invite code</label><textarea id="in-offer" spellcheck="false"></textarea></div>
-    <button class="btn" data-act="make-answer">Create reply code</button>
-    <div class="field"><label for="out-answer">2 · Send this reply code back to the host</label><textarea id="out-answer" readonly spellcheck="false"></textarea></div>
-    <button class="btn inline" data-act="copy-answer">Copy reply</button>
+    <div class="field"><label for="in-room">Room code</label><input id="in-room" class="codein" type="text" maxlength="9" placeholder="7KQ4MX" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+    <button class="btn primary" data-act="join-room">Join</button>
     <div class="status" id="join-status"></div>
-    <button class="btn" data-go="menu" data-act="leave">Back</button>
+    <details class="adv"><summary>The host sent a long invite code instead?</summary>
+      <div class="field"><label for="in-offer">1 · Paste the host's invite code</label><textarea id="in-offer" spellcheck="false"></textarea></div>
+      <button class="btn" data-act="make-answer">Create reply code</button>
+      <div class="field"><label for="out-answer">2 · Send this reply code back to the host</label><textarea id="out-answer" readonly spellcheck="false"></textarea></div>
+      <button class="btn inline" data-act="copy-answer">Copy reply</button>
+    </details>
+    <button class="btn" data-go="menu">Back</button>
   </div>
 </section>
 
@@ -1912,6 +1930,7 @@ class ClientConnection {
     this.snapSendTick = new Int32Array(64).fill(-1);
     this.snapSendTime = new Float64Array(64);
     this.snapSeq = 0;
+    this.snapshotEvery = 0;          // 0 = server default
   }
 }
 
@@ -1945,11 +1964,16 @@ class AuthoritativeServer {
 
   /* ------------------------------------------------------------ links */
   /** link: { send(u8, len, reliable) }. Returns the connection id. */
-  acceptConnection(link, isHost) {
+  acceptConnection(link, isHost, opts) {
     const id = this.nextConnId++;
-    this.conns.set(id, new ClientConnection(id, link, isHost));
+    const c = new ClientConnection(id, link, isHost);
+    if (opts && opts.snapshotEvery) c.snapshotEvery = opts.snapshotEvery;
+    this.conns.set(id, c);
     return id;
   }
+
+  /** Relayed links get fewer snapshots than direct ones (0 = default rate). */
+  setSnapshotEvery(id, every) { const c = this.conns.get(id); if (c) c.snapshotEvery = every; }
 
   disconnect(id) {
     const c = this.conns.get(id);
@@ -2175,7 +2199,7 @@ class AuthoritativeServer {
       }
     }
     if (this.rosterDirty) { this.rosterDirty = false; this.broadcastRoster(); }
-    if (W.tick % this.snapshotEvery === 0) this.broadcastSnapshot();
+    this.broadcastSnapshot();
     const st = this.stats;
     st.ticks++; st.accMs += perfNow() - t0;
     if (++st.accN >= 120) { st.tickMs = st.accMs / st.accN; st.accMs = 0; st.accN = 0; }
@@ -2218,6 +2242,10 @@ class AuthoritativeServer {
 
   broadcastSnapshot() {
     const W = this.world;
+    const every = this.snapshotEvery;
+    let due = false;
+    for (const c of this.conns.values()) if (c.welcomed && W.tick % (c.snapshotEvery || every) === 0) { due = true; break; }
+    if (!due) return;
     // shared part: every fighter (compact), items, projectiles, recent events
     const cw = this.common.reset();
     let nf = 0; for (let _nf = 0; _nf < W.fighters.length; _nf++) { const f = W.fighters[_nf]; if (f.active) nf++; }
@@ -2255,7 +2283,7 @@ class AuthoritativeServer {
 
     // per client: header with its own acks and timing, its full state, then the shared part
     for (const c of this.conns.values()) {
-      if (!c.welcomed) continue;
+      if (!c.welcomed || W.tick % (c.snapshotEvery || every) !== 0) continue;
       const w = this.out.reset();
       c.snapSeq = (c.snapSeq + 1) & 0xffff;
       w.u8(MSG.SNAPSHOT); w.u32(W.tick); w.u16(c.snapSeq); w.u8(W.matchId);
@@ -2376,6 +2404,8 @@ class NetworkTransport {
   onMessage(fn) { this.handler = fn; }
   disconnect() { this.connected = false; }
   update(now) {}
+  /** Send input packets every Nth tick (inputs are redundant, so none are lost). */
+  get inputSendEvery() { return 1; }
   get label() { return 'abstract'; }
 }
 
@@ -2420,7 +2450,8 @@ class SimulatedTransport extends NetworkTransport {
     this.down.update(now);
   }
   disconnect() { this.up.clear(); this.down.clear(); this.inner.disconnect(); this.connected = false; }
-  get label() { return this.inner.label + ' + simulated network'; }
+  get inputSendEvery() { return this.inner.inputSendEvery; }
+  get label() { return this.inner.label + (this.sim.rttMs || this.sim.jitterMs || this.sim.lossPercent ? ' + simulated network' : ''); }
 }
 
 /* ==========================================================================
@@ -2903,7 +2934,9 @@ class GameClient {
     this.pred.prev.copyFrom(this.pred.local);
     this.pred.step(t, inp, this.fx);
     this.checkPredictedHit(t);
-    this.sendInputs(t);
+    // relayed links send every other tick (each packet repeats the previous inputs)
+    const every = this.transport.inputSendEvery || 1;
+    if (every <= 1 || t % every === 0) this.sendInputs(t);
   }
 
   sendInputs(t) {
@@ -3122,6 +3155,510 @@ class GameClient {
   }
 }
 
+/* ==========================================================================
+   RELAY TRANSPORT (room codes)
+   Works where peer-to-peer cannot (office, school and hotel networks that
+   block UDP and NAT hole punching): every packet travels over a TLS
+   WebSocket to a public MQTT broker, which forwards it to the other side.
+   MQTT 3.1.1 is spoken directly here, no library.
+
+   The host listens on every relay it can reach at once; a guest knocks on
+   all of them and keeps the first one where the host answers, so the two
+   only need one relay in common. Once connected, the guest quietly tries a
+   direct WebRTC link using the relay for signalling; if the network allows
+   it, traffic moves there (lower latency), otherwise it stays relayed.
+
+   Room code → topic names are hashed, so the code is not visible on the
+   broker. Traffic to the broker is TLS, but the broker itself can read it:
+   it carries game inputs and state only.
+   ========================================================================== */
+const RELAY_BROKERS = [
+  { name: 'Eclipse', url: 'wss://mqtt.eclipseprojects.io:443/mqtt' },
+  { name: 'shiftr.io', url: 'wss://public.cloud.shiftr.io:443/', username: 'public', password: 'public' },
+  { name: 'EMQX', url: 'wss://broker.emqx.io:8084/mqtt' },
+  { name: 'HiveMQ', url: 'wss://broker.hivemq.com:8884/mqtt' },
+  { name: 'Mosquitto', url: 'wss://test.mosquitto.org:8081/' },
+];
+const RTC_CONFIG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }] };
+const RELAY_SNAPSHOT_EVERY = 3;   // 20 Hz snapshots while relayed (fewer, larger-latency hops)
+
+/** Relays in use: ?relay=wss://a/mqtt,wss://b/mqtt in the page URL replaces
+ *  the public list (for a private broker, or tests). */
+function relayBrokers() {
+  try {
+    if (typeof location !== 'undefined' && location.search) {
+      const v = new URLSearchParams(location.search).get('relay');
+      if (v) return v.split(',').map((url, i) => ({ name: 'custom ' + (i + 1), url: url.trim() })).filter((b) => /^wss?:\/\//.test(b.url));
+    }
+  } catch (e) { /* no URL API */ }
+  return RELAY_BROKERS;
+}
+
+const ROOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';   // no 0/O, 1/I
+function randomBytes(n) {
+  const b = new Uint8Array(n);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(b);
+  else for (let i = 0; i < n; i++) b[i] = (Math.random() * 256) | 0;
+  return b;
+}
+function makeRoomCode() {
+  const b = randomBytes(6);
+  let s = '';
+  for (let i = 0; i < 6; i++) s += ROOM_ALPHABET[b[i] & 31];
+  return s;
+}
+/** Accepts "7kq-4mx", " 7KQ4MX " etc. Returns '' if it is not a valid code. */
+function normalizeRoomCode(s) {
+  const c = String(s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (c.length !== 6) return '';
+  for (let i = 0; i < 6; i++) if (ROOM_ALPHABET.indexOf(c[i]) < 0) return '';
+  return c;
+}
+function hashString(str, seed) {   // cyrb53
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+function relayTopicBase(code) { return 'skybreak/v1/' + hashString('skybreak-room:' + code, 7); }
+function bytesHex(b) { let s = ''; for (let i = 0; i < b.length; i++) s += (b[i] < 16 ? '0' : '') + b[i].toString(16); return s; }
+function guestKey(u8, off) { let k = 0; for (let i = 0; i < 6; i++) k = k * 256 + u8[off + i]; return k; }
+
+/* Relay frame: [type u8][guest id 6 bytes, guest→host only][game bytes] */
+const RF = Object.freeze({ KNOCK: 1, ACCEPT: 2, DATA: 3, DATA_R: 4, BYE: 5, RTC: 6, FULL: 7 });
+
+/* ------------------------------------------------------------ MqttClient
+   The subset of MQTT 3.1.1 a relay needs: CONNECT, SUBSCRIBE to one topic,
+   PUBLISH at QoS 0 and keep-alive pings. Incoming bytes are reassembled, so
+   packets split across (or batched into) WebSocket messages are fine. */
+class MqttClient {
+  constructor(broker) {
+    this.broker = broker; this.ws = null; this.state = 'idle';
+    this.onMessage = null; this.onClose = null; this._onConnack = null;
+    this.inBuf = new Uint8Array(1 << 16); this.inLen = 0;
+    this.out = new Uint8Array(4096);
+    this.topics = new Map();
+    this.pingTimer = 0; this.lastRx = 0;
+    this.clientId = 'sky' + bytesHex(randomBytes(8));
+  }
+
+  connect(timeoutMs) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const fail = (why) => { if (done) return; done = true; clearTimeout(timer); this.close(); reject(new Error(why)); };
+      const timer = setTimeout(() => fail('timeout'), timeoutMs || 8000);
+      let ws;
+      try { ws = new WebSocket(this.broker.url, ['mqtt']); } catch (e) { fail('bad url'); return; }
+      this.ws = ws; this.state = 'connecting';
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => this.sendConnect();
+      ws.onerror = () => fail('network error');
+      ws.onclose = () => {
+        if (!done) { fail('closed'); return; }
+        if (this.state !== 'closed') { this.state = 'closed'; clearInterval(this.pingTimer); if (this.onClose) this.onClose(); }
+      };
+      ws.onmessage = (e) => { this.lastRx = perfNow(); this.feed(new Uint8Array(e.data)); };
+      this._onConnack = (rc) => {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        if (rc !== 0) { this.close(); reject(new Error('refused (' + rc + ')')); return; }
+        this.state = 'open'; this.lastRx = perfNow();
+        this.pingTimer = setInterval(() => this.ping(), 15000);
+        resolve(this);
+      };
+    });
+  }
+
+  close() {
+    clearInterval(this.pingTimer);
+    const ws = this.ws;
+    this.state = 'closed';
+    if (!ws) return;
+    try { if (ws.readyState === 1) ws.send(new Uint8Array([0xe0, 0])); ws.close(); } catch (e) { /* already closed */ }
+  }
+
+  get open() { return this.state === 'open' && this.ws && this.ws.readyState === 1; }
+
+  topicBytes(t) { let b = this.topics.get(t); if (!b) { b = ByteWriter.enc.encode(t); this.topics.set(t, b); } return b; }
+
+  ensureOut(n) { if (this.out.length < n) this.out = new Uint8Array(Math.max(n, this.out.length * 2)); return this.out; }
+
+  static writeLength(buf, p, n) {
+    do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; buf[p++] = d; } while (n > 0);
+    return p;
+  }
+  static writeStr(buf, p, bytes) { buf[p++] = bytes.length >> 8; buf[p++] = bytes.length & 255; buf.set(bytes, p); return p + bytes.length; }
+
+  sendConnect() {
+    const enc = ByteWriter.enc, cid = enc.encode(this.clientId);
+    const user = this.broker.username ? enc.encode(this.broker.username) : null;
+    const pass = this.broker.password ? enc.encode(this.broker.password) : null;
+    const rem = 10 + 2 + cid.length + (user ? 2 + user.length : 0) + (pass ? 2 + pass.length : 0);
+    const b = this.ensureOut(rem + 5);
+    let p = 0;
+    b[p++] = 0x10; p = MqttClient.writeLength(b, p, rem);
+    b[p++] = 0; b[p++] = 4; b[p++] = 77; b[p++] = 81; b[p++] = 84; b[p++] = 84;   // "MQTT"
+    b[p++] = 4;                                                                     // protocol level 3.1.1
+    b[p++] = 0x02 | (user ? 0x80 : 0) | (pass ? 0x40 : 0);                          // clean session
+    b[p++] = 0; b[p++] = 60;                                                        // keep-alive 60 s
+    p = MqttClient.writeStr(b, p, cid);
+    if (user) p = MqttClient.writeStr(b, p, user);
+    if (pass) p = MqttClient.writeStr(b, p, pass);
+    this.ws.send(b.subarray(0, p));
+  }
+
+  subscribe(topic) {
+    if (!this.open) return;
+    const t = this.topicBytes(topic), rem = 2 + 2 + t.length + 1;
+    const b = this.ensureOut(rem + 5);
+    let p = 0;
+    b[p++] = 0x82; p = MqttClient.writeLength(b, p, rem);
+    b[p++] = 0; b[p++] = 1;                  // packet id
+    p = MqttClient.writeStr(b, p, t);
+    b[p++] = 0;                              // QoS 0
+    this.ws.send(b.subarray(0, p));
+  }
+
+  /** PUBLISH QoS 0 with payload [type][head...][body...]. */
+  publish(topic, type, head, headLen, body, bodyLen) {
+    if (!this.open) return false;
+    if (this.ws.bufferedAmount > 512 * 1024) return false;      // congested: drop, newer data follows
+    const t = this.topicBytes(topic), rem = 2 + t.length + 1 + headLen + bodyLen;
+    const b = this.ensureOut(rem + 5);
+    let p = 0;
+    b[p++] = 0x30; p = MqttClient.writeLength(b, p, rem);
+    p = MqttClient.writeStr(b, p, t);
+    b[p++] = type;
+    for (let i = 0; i < headLen; i++) b[p++] = head[i];
+    for (let i = 0; i < bodyLen; i++) b[p++] = body[i];
+    this.ws.send(b.subarray(0, p));
+    return true;
+  }
+
+  ping() {
+    if (!this.open) return;
+    if (perfNow() - this.lastRx > 90000) { this.close(); if (this.onClose) this.onClose(); return; }
+    this.ws.send(new Uint8Array([0xc0, 0]));
+  }
+
+  feed(chunk) {
+    if (this.inLen + chunk.length > this.inBuf.length) {
+      const nb = new Uint8Array(Math.max(this.inBuf.length * 2, this.inLen + chunk.length));
+      nb.set(this.inBuf.subarray(0, this.inLen)); this.inBuf = nb;
+    }
+    this.inBuf.set(chunk, this.inLen); this.inLen += chunk.length;
+    const buf = this.inBuf;
+    let p = 0;
+    for (;;) {
+      if (this.inLen - p < 2) break;
+      let i = p + 1, rem = 0, mult = 1, complete = false;
+      for (let k = 0; k < 4 && i < this.inLen; k++) {
+        const d = buf[i++]; rem += (d & 127) * mult; mult *= 128;
+        if (!(d & 128)) { complete = true; break; }
+      }
+      if (!complete) { if (i - p > 4) { this.close(); return; } break; }
+      if (i + rem > this.inLen) break;
+      this.handle(buf[p], i, rem);
+      if (this.inBuf !== buf) return;           // closed/reset while handling
+      p = i + rem;
+    }
+    if (p > 0) { buf.copyWithin(0, p, this.inLen); this.inLen -= p; }
+  }
+
+  handle(hdr, off, len) {
+    const buf = this.inBuf;
+    switch (hdr >> 4) {
+      case 2: if (this._onConnack) this._onConnack(buf[off + 1]); break;               // CONNACK
+      case 3: {                                                                         // PUBLISH
+        const qos = (hdr >> 1) & 3, tl = (buf[off] << 8) | buf[off + 1];
+        let q = off + 2 + tl; if (qos) q += 2;
+        const n = off + len - q;
+        if (n > 0 && this.onMessage) this.onMessage(buf.subarray(q, q + n), n);
+        break;
+      }
+      default: break;                                                                   // SUBACK, PINGRESP
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ host */
+class RelayPeer {
+  constructor(host, entry, key, idBytes) {
+    this.host = host; this.entry = entry; this.key = key;
+    this.topic = host.base + '/g/' + bytesHex(idBytes);
+    this.lastSeen = perfNow();
+    this.pc = null; this.u = null; this.r = null; this.direct = false; this.pending = [];
+    this.connId = host.server.acceptConnection({ send: (b, len, reliable) => this.send(b, len, reliable) }, false,
+      { snapshotEvery: RELAY_SNAPSHOT_EVERY });
+  }
+  send(bytes, len, reliable) {
+    if (this.direct) {
+      const ch = reliable ? this.r : this.u;
+      if (ch && ch.readyState === 'open') { if (reliable || ch.bufferedAmount < 256 * 1024) ch.send(bytes.subarray(0, len)); return; }
+    }
+    this.entry.client.publish(this.topic, reliable ? RF.DATA_R : RF.DATA, null, 0, bytes, len);
+  }
+  sendFrame(type, bytes, len) { this.entry.client.publish(this.topic, type, null, 0, bytes || EMPTY_BYTES, len || 0); }
+  sendRtc(obj) { const b = ByteWriter.enc.encode(JSON.stringify(obj)); this.sendFrame(RF.RTC, b, b.length); }
+
+  /** Guest offered a direct link: answer it (signalling rides on the relay). */
+  async onRtc(u8, len) {
+    if (typeof RTCPeerConnection === 'undefined') return;
+    let msg;
+    try { msg = JSON.parse(ByteReader.dec.decode(u8.subarray(0, len))); } catch (e) { return; }
+    try {
+      if (typeof msg.o === 'string') {
+        this.closeDirect();
+        const pc = this.pc = new RTCPeerConnection(RTC_CONFIG);
+        pc.onicecandidate = (e) => this.sendRtc({ c: e.candidate ? e.candidate.toJSON() : null });
+        pc.ondatachannel = (e) => {
+          const ch = e.channel;
+          ch.binaryType = 'arraybuffer';
+          if (ch.label === 'u') this.u = ch; else this.r = ch;
+          ch.onopen = () => { if (this.u && this.r && this.u.readyState === 'open' && this.r.readyState === 'open') this.setDirect(true); };
+          ch.onclose = () => this.setDirect(false);
+          ch.onmessage = (ev) => { this.lastSeen = perfNow(); const b = new Uint8Array(ev.data); this.host.server.receive(this.connId, b, b.length); };
+        };
+        pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.setDirect(false); };
+        await pc.setRemoteDescription({ type: 'offer', sdp: msg.o });
+        for (const c of this.pending) await pc.addIceCandidate(c).catch(() => {});
+        this.pending.length = 0;
+        await pc.setLocalDescription(await pc.createAnswer());
+        this.sendRtc({ a: pc.localDescription.sdp });
+      } else if (msg.c) {
+        if (this.pc && this.pc.remoteDescription) await this.pc.addIceCandidate(msg.c).catch(() => {});
+        else if (this.pending.length < 64) this.pending.push(msg.c);
+      }
+    } catch (e) { this.closeDirect(); }
+  }
+  setDirect(on) {
+    if (on === this.direct) return;
+    this.direct = on;
+    this.host.server.setSnapshotEvery(this.connId, on ? 0 : RELAY_SNAPSHOT_EVERY);
+    this.host.onChange();
+  }
+  closeDirect() {
+    this.setDirect(false);
+    if (this.pc) { try { this.pc.close(); } catch (e) { /* ignore */ } }
+    this.pc = null; this.u = null; this.r = null; this.pending.length = 0;
+  }
+}
+const EMPTY_BYTES = new Uint8Array(0);
+
+class RelayHost {
+  constructor(server, onChange) {
+    this.server = server; this.onChange = onChange || (() => {});
+    this.code = makeRoomCode(); this.base = relayTopicBase(this.code); this.inbox = this.base + '/h';
+    this.relays = []; this.guests = new Map(); this.timer = 0; this.closed = false;
+  }
+  open() {
+    for (const broker of relayBrokers()) {
+      const entry = { broker, client: new MqttClient(broker), state: 'connecting' };
+      this.relays.push(entry);
+      entry.client.onMessage = (u8, len) => this.onFrame(entry, u8, len);
+      entry.client.onClose = () => { entry.state = 'offline'; this.onChange(); };
+      entry.client.connect(9000)
+        .then(() => { if (this.closed) { entry.client.close(); return; } entry.client.subscribe(this.inbox); entry.state = 'online'; this.onChange(); })
+        .catch(() => { entry.state = 'offline'; this.onChange(); });
+    }
+    this.timer = setInterval(() => this.sweep(), 1000);
+    return this;
+  }
+  get online() { let n = 0; for (const r of this.relays) if (r.state === 'online') n++; return n; }
+  get pendingRelays() { let n = 0; for (const r of this.relays) if (r.state === 'connecting') n++; return n; }
+
+  onFrame(entry, u8, len) {
+    if (len < 7) return;
+    const type = u8[0], key = guestKey(u8, 1);
+    let g = this.guests.get(key);
+    if (type === RF.KNOCK) {
+      if (!g) {
+        if (this.guests.size >= 32) { entry.client.publish(this.base + '/g/' + bytesHex(u8.subarray(1, 7)), RF.FULL, null, 0, EMPTY_BYTES, 0); return; }
+        g = new RelayPeer(this, entry, key, u8.subarray(1, 7));
+        this.guests.set(key, g);
+        this.onChange();
+      }
+      if (g.entry === entry) { g.lastSeen = perfNow(); g.sendFrame(RF.ACCEPT); }
+      return;
+    }
+    if (!g || g.entry !== entry) return;
+    g.lastSeen = perfNow();
+    if (type === RF.DATA || type === RF.DATA_R) this.server.receive(g.connId, u8.subarray(7), len - 7);
+    else if (type === RF.RTC) g.onRtc(u8.subarray(7), len - 7);
+    else if (type === RF.BYE) this.drop(g);
+  }
+
+  /** Guests that went silent (closed the tab, lost the network) are removed. */
+  sweep() {
+    const now = perfNow();
+    for (const g of this.guests.values()) if (now - g.lastSeen > 10000) this.drop(g);
+  }
+  drop(g) {
+    g.closeDirect();
+    this.server.disconnect(g.connId);
+    this.guests.delete(g.key);
+    this.onChange();
+  }
+  counts() { let direct = 0, relayed = 0; for (const g of this.guests.values()) { if (g.direct) direct++; else relayed++; } return { direct, relayed }; }
+  close() {
+    this.closed = true;
+    clearInterval(this.timer);
+    for (const g of this.guests.values()) { g.sendFrame(RF.BYE); g.closeDirect(); this.server.disconnect(g.connId); }
+    this.guests.clear();
+    for (const r of this.relays) r.client.close();
+  }
+}
+
+/* ----------------------------------------------------------------- guest */
+class RelayClientTransport extends NetworkTransport {
+  constructor(code) {
+    super();
+    this.code = code; this.base = relayTopicBase(code); this.hostTopic = this.base + '/h';
+    this.idBytes = randomBytes(6); this.inbox = this.base + '/g/' + bytesHex(this.idBytes);
+    this.relays = []; this.chosen = null; this.onState = null; this.lastHostSeen = 0; this.live = 0;
+    this.pc = null; this.u = null; this.r = null; this.direct = false; this.pending = []; this.rtcTimer = 0;
+    this.error = '';
+  }
+  get inputSendEvery() { return this.direct ? 1 : 2; }       // 30 Hz input packets over the relay
+  get label() { return this.direct ? 'direct WebRTC (via relay signalling)' : 'relay · ' + (this.chosen ? this.chosen.broker.name : '…'); }
+
+  /** Resolves once the host has accepted us on some relay. */
+  connect() {
+    return new Promise((resolve, reject) => {
+      const brokers = relayBrokers();
+      let finished = false, failed = 0, reached = 0;
+      const finish = (err, entry) => {
+        if (finished) return;
+        finished = true; clearTimeout(timeout);
+        for (const r of this.relays) { clearInterval(r.knock); if (r !== entry) r.client.close(); }
+        if (err) { this.error = err.message; reject(err); return; }
+        this.chosen = entry; this.connected = true; this.lastHostSeen = perfNow();
+        entry.client.onClose = () => this.lost('The relay connection closed');
+        this.live = setInterval(() => { if (this.connected && perfNow() - this.lastHostSeen > 10000) this.lost('The host stopped responding'); }, 1000);
+        resolve();
+        this.tryDirect();
+      };
+      const timeout = setTimeout(() => finish(new Error(reached ? 'room-not-found' : 'no-relay')), 10000);
+      this.accept = (entry) => finish(null, entry);
+      this.reject = (why) => finish(new Error(why));
+      for (const broker of brokers) {
+        const entry = { broker, client: new MqttClient(broker), knock: 0 };
+        this.relays.push(entry);
+        entry.client.onMessage = (u8, len) => this.onFrame(entry, u8, len);
+        entry.client.connect(9000).then(() => {
+          if (finished) { entry.client.close(); return; }
+          reached++;
+          entry.client.subscribe(this.inbox);
+          const knock = () => entry.client.publish(this.hostTopic, RF.KNOCK, this.idBytes, 6, EMPTY_BYTES, 0);
+          knock(); entry.knock = setInterval(knock, 1000);
+        }).catch(() => { if (++failed === brokers.length) finish(new Error('no-relay')); });
+      }
+    });
+  }
+
+  onFrame(entry, u8, len) {
+    const type = u8[0];
+    if (!this.chosen) {
+      if (type === RF.ACCEPT && this.accept) this.accept(entry);
+      else if (type === RF.FULL && this.reject) this.reject('room-full');
+      return;
+    }
+    if (entry !== this.chosen) return;
+    this.lastHostSeen = perfNow();
+    if (type === RF.DATA || type === RF.DATA_R) {
+      this.stats.bytesIn += len - 1; this.stats.packetsIn++;
+      if (this.handler) this.handler(u8.subarray(1), len - 1, type === RF.DATA_R);
+    } else if (type === RF.RTC) this.onRtc(u8.subarray(1), len - 1);
+    else if (type === RF.BYE) this.lost('The host closed the room');
+  }
+
+  sendMessage(u8, len, reliable) {
+    if (this.direct) {
+      const ch = reliable ? this.r : this.u;
+      if (ch && ch.readyState === 'open') {
+        if (reliable || ch.bufferedAmount < 64 * 1024) { ch.send(u8.subarray(0, len)); this.stats.bytesOut += len; this.stats.packetsOut++; }
+        return;
+      }
+    }
+    if (!this.chosen) return;
+    if (this.chosen.client.publish(this.hostTopic, reliable ? RF.DATA_R : RF.DATA, this.idBytes, 6, u8, len)) { this.stats.bytesOut += len; this.stats.packetsOut++; }
+  }
+
+  sendRtc(obj) {
+    if (!this.chosen) return;
+    const b = ByteWriter.enc.encode(JSON.stringify(obj));
+    this.chosen.client.publish(this.hostTopic, RF.RTC, this.idBytes, 6, b, b.length);
+  }
+
+  /** Try to upgrade to a direct peer-to-peer link; stay on the relay if not. */
+  async tryDirect() {
+    if (typeof RTCPeerConnection === 'undefined') return;
+    try {
+      const pc = this.pc = new RTCPeerConnection(RTC_CONFIG);
+      const u = pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 });
+      const r = pc.createDataChannel('r', { ordered: true });
+      for (const ch of [u, r]) {
+        ch.binaryType = 'arraybuffer';
+        ch.onopen = () => { if (u.readyState === 'open' && r.readyState === 'open') { this.u = u; this.r = r; this.setDirect(true); } };
+        ch.onclose = () => this.setDirect(false);
+        ch.onmessage = (ev) => {
+          this.lastHostSeen = perfNow();
+          const b = new Uint8Array(ev.data);
+          this.stats.bytesIn += b.length; this.stats.packetsIn++;
+          if (this.handler) this.handler(b, b.length, ch === r);
+        };
+      }
+      pc.onicecandidate = (e) => this.sendRtc({ c: e.candidate ? e.candidate.toJSON() : null });
+      pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.setDirect(false); };
+      await pc.setLocalDescription(await pc.createOffer());
+      this.sendRtc({ o: pc.localDescription.sdp });
+      // no direct link after 15 s: the network does not allow one, keep the relay
+      this.rtcTimer = setTimeout(() => { if (!this.direct) this.closeDirect(); }, 15000);
+    } catch (e) { this.closeDirect(); }
+  }
+  async onRtc(u8, len) {
+    if (!this.pc) return;
+    let msg;
+    try { msg = JSON.parse(ByteReader.dec.decode(u8.subarray(0, len))); } catch (e) { return; }
+    try {
+      if (typeof msg.a === 'string') {
+        await this.pc.setRemoteDescription({ type: 'answer', sdp: msg.a });
+        for (const c of this.pending) await this.pc.addIceCandidate(c).catch(() => {});
+        this.pending.length = 0;
+      } else if (msg.c) {
+        if (this.pc.remoteDescription) await this.pc.addIceCandidate(msg.c).catch(() => {});
+        else if (this.pending.length < 64) this.pending.push(msg.c);
+      }
+    } catch (e) { this.closeDirect(); }
+  }
+  setDirect(on) {
+    if (on === this.direct) return;
+    this.direct = on;
+    if (on) clearTimeout(this.rtcTimer);
+    if (this.onState) this.onState(on ? 'direct' : 'relay');
+  }
+  closeDirect() {
+    clearTimeout(this.rtcTimer);
+    this.setDirect(false);
+    if (this.pc) { try { this.pc.close(); } catch (e) { /* ignore */ } }
+    this.pc = null; this.u = null; this.r = null; this.pending.length = 0;
+  }
+  lost(why) {
+    if (!this.connected) return;
+    this.connected = false; this.error = why;
+    clearInterval(this.live);
+    if (this.onState) this.onState('closed', why);
+  }
+  disconnect() {
+    if (this.chosen && this.chosen.client.open) this.chosen.client.publish(this.hostTopic, RF.BYE, this.idBytes, 6, EMPTY_BYTES, 0);
+    this.connected = false;
+    clearInterval(this.live);
+    this.closeDirect();
+    for (const r of this.relays) { clearInterval(r.knock); r.client.close(); }
+  }
+}
+
 /* Node (tests) */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -3131,6 +3668,7 @@ if (typeof module !== 'undefined' && module.exports) {
     DirectTransport, NetworkTransport, GameClient, ClientPrediction, ReconciliationSystem, RemotePlayerInterpolator,
     SnapshotBuffer, ClockSync, FIGHTER_FIELDS, fightersEqual, isIntangible, applyInputBufferConfig, FIGHTER_HALF_W, FIGHTER_HEIGHT,
     PALETTE, SLOT_BOT, SLOT_HUMAN, ByteWriter, ByteReader, writeFighterFull, readFighterFull,
+    MqttClient, RelayHost, RelayClientTransport, makeRoomCode, normalizeRoomCode, relayTopicBase, RELAY_BROKERS, RF,
   };
 }
 </script>
@@ -4637,7 +5175,6 @@ class LatencyProbe {
    Signalling is manual (copy/paste of compressed SDP), so no signalling
    server or third-party script is needed. ICE uses public STUN only.
    ========================================================================== */
-const RTC_CONFIG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }] };
 
 const SignalCodec = {
   async encode(obj) {
@@ -4895,6 +5432,7 @@ class UI {
     $('#chk-adaptive').addEventListener('change', (e) => { NETWORK_CONFIG.adaptiveInterpolation = e.target.checked; });
     $('#chk-boxes').addEventListener('change', (e) => { G.renderer.showBoxes = e.target.checked; });
     $('#chk-ghost').addEventListener('change', (e) => { G.renderer.showGhost = e.target.checked; });
+    $('#in-room').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); G.action('join-room'); } });
     const tj = $('#chk-tapjump'); tj.checked = !!S.tapJump;
     tj.addEventListener('change', () => { S.tapJump = tj.checked; G.input.tapJump = tj.checked; save(); });
     this.refresh();
@@ -4919,7 +5457,23 @@ class UI {
     $('#host-invites').appendChild(box);
   }
   refreshHost() {
-    const G = this.game;
+    const G = this.game, R = G.relay;
+    if (R) {
+      $('#room-code').textContent = R.code;
+      const on = R.online, pending = R.pendingRelays, el = $('#relay-status');
+      const { direct, relayed } = R.counts();
+      let t;
+      if (on === 0 && pending > 0) t = 'Opening the room on ' + R.relays.length + ' relays…';
+      else if (on === 0) t = "Couldn't reach any relay: this network may block WebSockets. Try the manual codes below.";
+      else {
+        const names = [];
+        for (const r of R.relays) if (r.state === 'online') names.push(r.broker.name);
+        t = 'Room open on ' + on + ' of ' + R.relays.length + ' relays (' + names.join(', ') + ')';
+      }
+      if (direct + relayed) t += ' · guests: ' + [direct ? direct + ' direct' : '', relayed ? relayed + ' via relay' : ''].filter(Boolean).join(', ');
+      el.textContent = t;
+      el.className = on === 0 && pending === 0 ? 'status bad' : 'status';
+    }
     if (G.rtcHost) for (const p of G.rtcHost.peers) if (p.stateEl) { p.stateEl.textContent = p.state; p.stateEl.style.color = p.state === 'connected' ? 'var(--good)' : ''; }
     this.rosterVersion = -1;
   }
@@ -5013,7 +5567,7 @@ class Game {
     this.fx = new EffectsSystem(this);
     this.netsim = new NetworkSimulator();
     this.netsim.rttMs = this.settings.rtt; this.netsim.lossPercent = this.settings.loss; this.netsim.jitterMs = this.settings.jitter;
-    this.server = null; this.client = null; this.rtcHost = null; this.rtc = null;
+    this.server = null; this.client = null; this.rtcHost = null; this.rtc = null; this.relay = null;
     this.mode = 'none'; this.paused = false;
     this.gameTime = 0; this.lastFrame = performance.now(); this.lastCount = -1; this.resultsAt = 0; this.attractRestartAt = 0;
     this.list = [];
@@ -5040,7 +5594,8 @@ class Game {
   teardown() {
     if (this.client) { try { this.client.disconnect(); } catch (e) { /* ignore */ } }
     if (this.rtcHost) this.rtcHost.close();
-    this.client = null; this.server = null; this.rtcHost = null; this.rtc = null;
+    if (this.relay) this.relay.close();
+    this.client = null; this.server = null; this.rtcHost = null; this.rtc = null; this.relay = null;
     this.paused = false; this.mode = 'none'; this.resultsAt = 0;
     this.fx.reset(); this.camera.ready = false;
     document.getElementById('host-invites').textContent = '';
@@ -5081,20 +5636,21 @@ class Game {
   }
 
   startHost() {
-    if (typeof RTCPeerConnection === 'undefined') { this.ui.toast('This browser has no WebRTC support'); return false; }
     this.teardown();
     this.netsim.rttMs = 0; this.netsim.lossPercent = 0; this.netsim.jitterMs = 0;
     this.server = new AuthoritativeServer();
     this.client = this.makeClient(new SimulatedTransport(new DirectTransport(this.server, true), this.netsim));
     this.rtcHost = new WebRTCHost(this.server, () => this.ui.refreshHost());
+    this.relay = new RelayHost(this.server, () => this.ui.refreshHost()).open();
     this.mode = 'host';
-    this.ui.showToolbar(true); this.ui.refresh();
+    this.ui.showToolbar(true); this.ui.refresh(); this.ui.refreshHost();
     this.client.connect(this.gameTime);
     return true;
   }
 
   async createInvite() {
     if (!this.rtcHost) return;
+    if (typeof RTCPeerConnection === 'undefined') { this.ui.toast('This browser has no WebRTC support'); return; }
     this.ui.toast('Gathering network candidates…', 4000);
     try { const peer = await this.rtcHost.createInvite(); this.ui.addInvite(peer); this.ui.toast('Invite ready: copy it to a friend'); }
     catch (e) { this.ui.toast('Could not create an invite: ' + (e.message || e)); }
@@ -5107,6 +5663,42 @@ class Game {
     const bots = Math.max(0, Math.min(MAX_PLAYERS, this.settings.fill) - humans);
     c.sendControl(CTRL.START, { bots, botLevel: this.settings.level, stocks: this.settings.hostStocks, minutes: this.settings.minutes, items: 1, seed: (Math.random() * 4294967295) >>> 0 });
     this.ui.show('none');
+  }
+
+  /** Join by room code over the relay (upgrades to a direct link on its own if possible). */
+  async joinRoom() {
+    const status = $('#join-status');
+    const code = normalizeRoomCode($('#in-room').value);
+    if (!code) { status.textContent = 'Room codes are 6 letters and digits, like 7KQ4MX.'; status.className = 'status bad'; return; }
+    status.className = 'status'; status.textContent = 'Looking for room ' + code + '…';
+    this.teardown();
+    this.netsim.rttMs = 0; this.netsim.lossPercent = 0; this.netsim.jitterMs = 0;
+    const rt = new RelayClientTransport(code);
+    this.rtc = rt;
+    this.client = this.makeClient(new SimulatedTransport(rt, this.netsim));
+    this.mode = 'guest';
+    rt.onState = (s, why) => {
+      if (this.rtc !== rt) return;
+      if (s === 'direct') this.ui.toast('Direct link to the host: lower latency', 3000);
+      else if (s === 'relay') this.ui.toast('Direct link lost: playing through the relay', 3000);
+      else if (s === 'closed') { this.ui.toast(why || 'Disconnected from the host', 5000); this.toMenu(); }
+    };
+    try {
+      await this.client.connect(this.gameTime);
+    } catch (e) {
+      if (this.rtc !== rt) return;
+      const why = e && e.message;
+      this.startAttract(); this.ui.show('join');
+      status.className = 'status bad';
+      status.textContent = why === 'no-relay' ? "Couldn't reach any relay server: this network may block WebSockets. Try the manual codes below."
+        : why === 'room-full' ? 'That room is full.'
+        : 'No open room with that code. Check it, and that the host still has the Host screen open.';
+      return;
+    }
+    if (this.rtc !== rt) return;
+    status.textContent = '';
+    this.ui.show('none'); this.ui.showToolbar(true); this.ui.refresh();
+    this.ui.toast('Joined room ' + code + ' through the ' + rt.chosen.broker.name + ' relay', 3000);
   }
 
   async joinWithInvite() {
@@ -5160,6 +5752,8 @@ class Game {
       case 'host-start': this.hostStart(); break;
       case 'leave': if (el && el.dataset.go) break; this.toMenu(); break;
       case 'make-answer': this.joinWithInvite(); break;
+      case 'join-room': this.joinRoom(); break;
+      case 'copy-code': if (this.relay) this.ui.copyText(this.relay.code); break;
       case 'copy-answer': this.ui.copyText($('#out-answer').value); break;
       case 'resume': this.resume(); break;
       case 'restart': this.paused = false; if (c) c.sendControl(CTRL.REMATCH); this.ui.show('none'); break;
