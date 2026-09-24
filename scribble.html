@@ -345,99 +345,172 @@ const PALETTE = ['#ffffff','#c1c1c1','#ef130b','#ff7100','#ffe400','#00cc00','#0
                  '#000000','#4c4c4c','#740b07','#c23800','#e8a200','#005510','#00569e','#0e0865','#550069','#a75574','#63300d'];
 const SIZES = [4, 10, 20, 38];
 
-const WORDS = ('abbey,accordion,acorn,acrobat,actor,airplane,airport,alarm' +
- 'clock,alien,almond,alpaca,alphabet,amber,ambulance,amphitheatre,anchor,angel,ankle,anniversary,anorak,ant,antelope,anthill,anvil,apartment,applaud,apple,apple' +
- 'pie,apricot,apron,aqueduct,arch,archer,archery,arena,arm,armadillo,armchair,arrow,artichoke,artist,asparagus,asteroid,astronaut,athlete,atom,attic,aurora,author,autograph,autumn,avalanche,avocado,axe,baboon,baby,backpack,bacon,badge,badger,badminton,bagel,bagpipes,baguette,bake,baker,bakery,balance,ball,ballerina,ballet,balloon,bamboo,banana,banana' +
- 'split,bandage,bandstand,banister,banjo,barbecue,barber,barcode,bark,barn,barracks,barrel,baseball,basement,basket,basketball,bassoon,bat,bathrobe,bathtub,battery,beach,beanie,beard,beaver,bed,bee,beehive,beetle,beetroot,bell,bell' +
- 'pepper,bell tower,belly,belt,bench,beret,bicycle,bike,billiards,bin,binoculars,bird,birthday,birthday cake,bison,black' +
- 'hole,blackberry,blackout,blacksmith,blanket,blazer,blender,blimp,blister,blood,blouse,blueberry,boar,boat,boathouse,bobsleigh,bodyguard,bog,bone,bonfire,bongo,bookmark,bookshelf,bookworm,boomerang,boots,bottle,bottle' +
- 'opener,boulder,bounce,bow,bow tie,bowl,bowler' +
- 'hat,bowling,box,boxing,bracelet,brain,branch,bread,breeze,brick,bride,bridge,briefcase,broccoli,brook,broom,brownie,bruise,bubble,bubble' +
- 'bath,bucket,buckle,bud,buffalo,builder,bulldog,bulldozer,bumblebee,bungalow,bunk' +
- 'bed,bunker,burger,burglar,burrito,bus,bush,butcher,butter,butterfly,cabbage,cabin,cabinet,cable' +
- 'car,cactus,cafe,cage,calculator,calendar,camel,camera,camouflage,campfire,campsite,canal,canary,candelabra,candle,candy,cannon,canoe,canyon,cap,cape,captain,car,caramel,caravan,cardboard' +
- 'box,cardigan,carnival,carpenter,carpet,carriage,carrot,cart,cartwheel,cash' +
- 'register,cashew,castle,cat,caterpillar,cathedral,cauldron,cauliflower,cave,caveman,cavern,ceiling' +
- 'fan,celery,cello,centaur,cereal,chain,chair,chalk,championship,chandelier,chariot,checkmate,cheek,cheer,cheerleader,cheese,cheeseburger,cheesecake,cheetah,chef,cherry,chess,chest,chew,chicken,chilli,chimney,chimney' +
- 'sweep,chimpanzee,chin,chipmunk,chocolate,chop,chopsticks,church,cinema,cinnamon,circus,clam,clap,clarinet,cliff,climb,clipboard,cloak,clock,clocktower,closet,clothes' +
- 'peg,clothesline,cloud,clover,clown,coach,coat,coat' +
- 'hanger,cobra,cobweb,cocoa,coconut,cocoon,coffee,coin,colander,colosseum,comb,comet,compass,computer,concert,condor,conductor,cone,constellation,convertible,cook,cookie,coral,corkscrew,corn,cosmonaut,cottage,couch,cough,countdown,courthouse,cow,cowboy,cowboy' +
- 'hat,coyote,crab,cracker,cranberry,crane,crate,crater,crawl,crayon,crescent' +
- 'moon,cricket,crocodile,croissant,croquet,crossword,crow,crowbar,crown,crumpet,crutch,cry,cube,cucumber,cup,cupboard,cupcake,curling,curry,curtain,cushion,custard,cyclist,cyclops,cymbal,dam,dance,dancer,dandelion,dart,dartboard,darts,dawn,deckchair,deer,denim,dentist,desert,desk,detective,dew,diamond,dice,didgeridoo,dig,digger,dimple,dinghy,dingo,dinosaur,discus,dishwasher,dive,diver,diving' +
- 'board,dock,doctor,dodgeball,dodo,dog,doghouse,doll,dolphin,domino,donkey,donut,doodle,door,doorbell,doorknob,doormat,double' +
- 'bass,dragon,dragonfly,drainpipe,drawbridge,drawer,dream,dress,drill,drink,drool,druid,drum,drummer,drumstick,dryer,duck,dumbbell,dumpling,dune,dungarees,dusk,duster,dustpan,duvet,dwarf,eagle,ear,earmuffs,earring,earth,earthquake,easel,echo,eclipse,eel,egg,eggcup,eggplant,elbow,electrician,electricity,elephant,elevator,elf,elk,emperor,emu,envelope,eraser,escalator,exercise,explorer,eyebrow,eyelash,fable,factory,faint,fairy,fairy' +
- 'tale,falcon,fan,farm,farmer,farmhouse,faucet,fawn,feather,fence,fencing,fern,ferret,ferry,festival,field,fig,filing' +
- 'cabinet,finger,fingernail,finish line,fire,fire extinguisher,fire' +
- 'truck,firefighter,firefly,fireplace,firewood,firework,fish,fishbowl,fisherman,fishing' +
- 'rod,fist,flag,flamingo,flashlight,flask,flea,flip' +
- 'flops,float,flood,florist,flower,flowerpot,flute,fly,foal,fog,fold,folder,football,forehead,forest,fork,forklift,fortress,fortune' +
- 'cookie,fossil,fountain,fox,frame,freckles,french fries,fridge,frog,frost,fruit,frying pan,fudge,funnel,fur' +
- 'coat,galaxy,gallery,gallop,garage,garden,garden' +
- 'gnome,gardener,garlic,gate,gazebo,gazelle,gecko,genie,gerbil,geyser,ghost,giant,giggle,gingerbread,giraffe,glacier,gladiator,glass,glasses,glider,globe,glove,glue,gnome,go-kart,goalkeeper,goat,goblet,goblin,goggles,gold,goldfish,golf,gondola,gong,goose,gorge,gorilla,gown,grapefruit,grapes,grass,grasshopper,grater,gravity,gravy,greenhouse,griffin,grill,grove,guinea' +
- 'pig,guitar,gum,gymnasium,gymnast,gymnastics,hail,hair,hairbrush,hairdresser,hairdryer,ham,hammer,hammock,hamster,hand,handbag,handcuffs,handshake,hangar,harbour,hard' +
- 'hat,hare,harp,harvest,hat,hatchet,haunted' +
- 'house,hawk,hay,haystack,hazelnut,headline,headphones,heart,hedge,hedgehog,hedgerow,heel,helicopter,helmet,hermit,heron,hiccup,hide,hide' +
- 'and seek,high' +
- 'five,highway,hiker,hill,hinge,hip,hippo,hive,hockey,honey,honeycomb,hoodie,hook,hopscotch,horizon,hornet,horse,horseshoe,hose,hospital,hot' +
- 'air balloon,hot chocolate,hotdog,hotel,hourglass,house,hovercraft,hug,hum,hunter,hurdle,hurricane,hut,hyena,ice cream,ice' +
- 'cube,ice rink,iceberg,icicle,igloo,iguana,imp,inhaler,ink,insect,iron,ironing' +
- 'board,island,itch,ivy,jackal,jacket,jackpot,jaguar,jam,jar,javelin,jaw,jeans,jeep,jelly,jellyfish,jester,jet,jet' +
- 'ski,jigsaw,jockey,jog,judge,judo,jug,juggle,juggler,juice,jukebox,jump,jumpsuit,jungle,kaleidoscope,kangaroo,karaoke,karate,kayak,kebab,kennel,ketchup,kettle,key,keyboard,keyhole,keyring,kick,kilt,king,kiosk,kite,kitten,knee,kneel,knife,knight,knit,knot,knuckle,koala,kraken,laboratory,ladder,ladle,ladybug,lagoon,lake,lamb,lamp,lampshade,landslide,lantern,laptop,lasagna,laser,lasso,laugh,lava,lawn' +
- 'mower,leaf,leapfrog,leash,leek,leg,leggings,lemon,lemonade,lemur,leopard,leotard,leprechaun,letter,lettuce,lever,library,lick,lid,lifeguard,light' +
- 'bulb,lighter,lighthouse,lightning,lily,lily' +
- 'pad,lime,limousine,limp,lion,lip,lipstick,liquorice,lizard,llama,lobster,lock,locker,locomotive,log,lollipop,lorry,loudspeaker,luggage,lullaby,lumberjack,lungs,lynx,macaroni,macaw,magazine,magician,magnet,magnifying' +
- 'glass,magpie,mailbox,mall,mallard,mallet,mammoth,manatee,mandolin,mango,mannequin,mansion,map,maple' +
- 'syrup,maracas,marathon,marble,marbles,march,marching' +
- 'band,marker,market,marmalade,marsh,marshmallow,mask,matchbox,mattress,mayor,maze,meadow,meatball,mechanic,medal,meditate,meerkat,megaphone,melon,melt,meringue,mermaid,meteor,metronome,microphone,microscope,microwave,midnight,milk,milkshake,milky' +
- 'way,mill,mime,miner,minibus,minotaur,mint,mirage,mirror,mist,mitten,moat,mole,monastery,money,mongoose,monk,monkey,monocle,monorail,monster,monument,moon,moon' +
- 'rock,moor,moose,mop,moped,mosque,mosquito,moss,motel,moth,motorbike,motorboat,mountain,mountain' +
- 'range,mountaineer,mouse,mousetrap,moustache,mouth,mud,muffin,mug,mule,mummy,muscle,museum,mushroom,music,musician,mustard,mystery,nachos,nail,nail' +
- 'file,napkin,narwhal,nebula,neck,necklace,nectar,nectarine,needle,nest,net,netball,newspaper,newt,night,nightgown,nightmare,ninja,nomad,noodles,nose,notebook,notepad,nurse,nut,oar,oasis,oatmeal,oboe,observatory,ocean,ocelot,octopus,office,ogre,oil,oil' +
- 'lamp,olive,omelette,onion,opera,orange,orangutan,orbit,orca,orchard,orchestra,organ,origami,ostrich,otter,oven,oven' +
- 'glove,overalls,owl,ox,oxygen,oyster,pacifier,paddle,padlock,pagoda,paint,paintbrush,painter,palace,palm,palm' +
- 'tree,pan,pancake,panda,panic,panther,pants,papaya,paper,paper' +
- 'bag,paperclip,parachute,parade,parakeet,paramedic,parasol,parrot,parsnip,party,passport,pasta,pastry,path,pavilion,paw,peach,peacock,peanut,peanut' +
- 'butter,pear,pearl,pebble,pedal,pelican,pen,pencil,pencil' +
- 'case,penguin,pepper,perfume,periscope,petal,pharaoh,pharmacy,pheasant,phoenix,phone,photo' +
- 'album,photographer,pianist,piano,pickle,pickup truck,picnic,pie,pier,pig,pigeon,piggy' +
- 'bank,piglet,pigtail,pillow,pillowcase,pilot,pin,pinch,pine cone,pineapple,ping' +
- 'pong,pinwheel,pipe,piranha,pirate,pitchfork,pixie,pizza,planet,plank,plant,plaster,plate,plateau,platypus,playground,playing' +
- 'cards,pliers,plug,plum,plumber,plunger,pocket,pocket watch,podium,poet,polar' +
- 'bear,pollen,pomegranate,pond,pony,ponytail,poodle,pool table,popcorn,porcupine,porridge,port,post' +
- 'office,postbox,postcard,poster,postman,pot,potato,potter,pour,pram,prawn,present,pretzel,prince,printer,prison,professor,projector,propeller,pub,pudding,puddle,puffin,pull,pulley,puma,pumpkin,punch,puppet,puppeteer,puppy,purse,push,puzzle,pyjamas,pyramid,python,quail,quarry,queen,quiche,quicksand,quilt,quiver,quiz,rabbit,raccoon,race,racket,radiator,radio,radish,raffle,raft,railway,rain,rainbow,raincoat,rainforest,raisin,rake,ram,ramp,rapids,raspberry,rat,rattle,raven,ravine,razor,receipt,recipe,record' +
- 'player,recorder,reef,referee,reindeer,relay' +
- 'race,remote,reporter,restaurant,rhino,rhubarb,rib,ribbon,rice,rickshaw,riddle,ride,ridge,ring,river,riverbank,road,roadrunner,robe,robin,robot,rock' +
- 'pool,rocket,rocking chair,rocking horse,rodeo,roll,roller skates,rollercoaster,rolling' +
- 'pin,roof,rooster,root,rope,rose,rounders,row,rowboat,rubber band,rucksack,rug,rugby,ruins,ruler,sack,saddle,safari,safe,safety' +
- 'pin,sailboat,sailing,sailor,salad,salamander,salami,salmon,salt,salute,samurai,sand,sandal,sandcastle,sandpaper,sandwich,sapling,sari,sash,satchel,satellite,saucepan,saucer,sausage,sausage' +
- 'roll,savannah,saw,sawmill,saxophone,scarecrow,scarf,school,scientist,scissors,scone,scooter,scoreboard,scorpion,scratch,scream,screw,screwdriver,scroll,scuba' +
- 'diving,sculptor,sea monster,seagull,seahorse,seal,seashell,seatbelt,seaweed,seed,seesaw,segway,sew,sewing' +
- 'machine,shack,shadow,shampoo,shark,shawl,shed,sheep,sheepdog,sheet' +
- 'music,shelf,shepherd,shin,ship,shipwreck,shirt,shiver,shoe,shoelace,shooting star,shopping' +
- 'trolley,shore,shortbread,shorts,shoulder,shout,shovel,shower,shrimp,shrub,shrug,shuttlecock,sideburns,sidecar,sieve,signpost,silhouette,silo,sing,singer,sink,sinkhole,sitar,skateboard,skatepark,skater,skeleton,skewer,ski,skier,skip,skipping' +
- 'rope,skirt,skull,skunk,sky,skyscraper,sled,sleep,sleeping' +
- 'bag,sleepover,sleigh,slide,slingshot,slip,slippers,sloth,slug,smile,smoke,smoothie,snail,snake,snare' +
- 'drum,sneeze,sniff,snooker,snore,snorkel,snow,snowball' +
- 'fight,snowboard,snowdrift,snowflake,snowman,snowmobile,snowplough,soap,soccer,sock,sofa,softball,solar panel,solar' +
- 'system,soldier,sombrero,somersault,sorcerer,soup,space' +
- 'station,spaceship,spacesuit,spacewalk,spade,spaghetti,spanner,sparkler,sparrow,spatula,speaker,speedboat,spelling' +
- 'bee,sphinx,spider,spin,spinach,spine,splash,sponge,spoon,spotlight,spring,sprinkler,sprint,spy,squash,squat,squid,squirrel,stable,stadium,stag,stage,stagecoach,stairs,stalactite,stallion,stamp,stapler,star,stare,starfish,starting' +
- 'gun,station,statue,steak,steam,steam' +
- 'train,steamroller,stepladder,stethoscope,stew,stilt,stingray,stockings,stomach,stone,stool,stopwatch,stork,storm,storybook,stove,straw,strawberry,stream,street,stretch,studio,stumble,submarine,subway,sugar,suit,suitcase,summer,summit,sumo,sun,sunbeam,sunburn,sundial,sunflower,sunglasses,sunhat,sunrise,sunset,superhero,supermarket,surf,surfboard,surfer,sushi,suspenders,swallow,swamp,swan,sweater,sweep,swim,swimmer,swimming' +
- 'pool,swimsuit,swing,sword,swordfish,table,table tennis,tablecloth,taco,tadpole,tail,tailor,talent' +
- 'show,tambourine,tandem,tangerine,tank,tape,tape' +
- 'measure,tapir,tarantula,tart,tattoo,taxi,tea,teabag,teacher,teacup,teapot,teaspoon,teddy' +
- 'bear,teeth,telephone,telescope,television,temple,tennis,tent,termite,terrace,theatre,thermometer,thief,thimble,thistle,thorn,thread,throne,thumb,thunder,thunderstorm,tiara,ticket,tickle,tide,tie,tiger,tightrope,time' +
- 'machine,tinsel,tiptoe,tire,toad,toast,toaster,toboggan,toe,toffee,toilet,tollbooth,tomato,tongue,toolbelt,toolbox,tooth,toothbrush,toothpaste,toothpick,top' +
- 'hat,torch,tornado,tortilla,tortoise,toucan,tourist,tournament,tow truck,towel,tower,toy,tractor,traffic' +
- 'light,train,tram,trampoline,tray,treadmill,treasure,treasure map,tree,treehouse,trench' +
- 'coat,triangle,tricycle,trip,tripod,troll,trombone,trophy,trout,truck,trumpet,tsunami,tuba,tug of' +
- 'war,tugboat,tulip,tuna,tundra,tunnel,turban,turkey,turnip,turret,turtle,tutu,tuxedo,tweezers,twig,twilight,twirl,type,typewriter,ufo,ukulele,umbrella,umpire,unicorn,unicycle,uniform,universe,urn,vacuum,valley,vampire,van,vanilla,vase,vault,vegetable,veil,vending' +
- 'machine,veranda,vest,vet,viking,village,vine,vinegar,vineyard,viola,violin,volcano,volleyball,vulture,waffle,wagon,waist,waistcoat,waiter,wallaby,wallet,wallpaper,walnut,walrus,wand,wardrobe,warehouse,warrior,warthog,washing' +
- 'machine,wasp,watch,water polo,waterfall,watering' +
- 'can,waterlily,watermelon,watermill,wave,weasel,weathervane,weaver,web,wedding,weightlifting,welder,wellies,werewolf,wetsuit,whale,wheat,wheel,wheelbarrow,wheelchair,whirlpool,whirlwind,whisk,whisper,whistle,whiteboard,wig,wildebeest,wildfire,willow,wind,windbreaker,windchime,windmill,window,windowsill,wine' +
- 'glass,wing,wink,winter,wire,wishbone,witch,wizard,wok,wolf,wombat,wood,woodland,woodpecker,wool,workbench,workshop,worm,wrapping' +
- 'paper,wreath,wrench,wrestle,wrestler,wrinkle,wrist,wristband,write,xylophone,yacht,yak,yard,yarn,yawn,yell,yeti,yo-yo,yoga,yoghurt,yolk,zebra,zeppelin,zigzag,zip,zipper,zodiac,zombie,zoo,zookeeper,zucchini').split(',');
+const WORDS = ('abacus,abbey,abseiling,acacia,accordion,acorn,acrobat,action figure,actor,advent calendar,airplane,airport,alarm clock,' +
+ 'alder,alien,alleyway,almond,alpaca,alphabet,amber,ambulance,amphitheatre,anagram,anchor,angel,angry,ankle,anniversary,' +
+ 'anorak,ant,antelope,anthill,anvil,apartment,applaud,apple,apple pie,apricot,apron,aquarium,aqueduct,arch,archer,archery,' +
+ 'archery target,arena,arm,armadillo,armchair,armour,arrow,art gallery,artichoke,artist,ash tree,asparagus,asteroid,' +
+ 'astronaut,athlete,atom,attic,aurora,author,autograph,autumn,avalanche,avalanche warning,avocado,axe,axle,baboon,baby,' +
+ 'baby carrier,back garden,backpack,bacon,badge,badge pin,badger,badminton,bagel,bagel slicer,bagpipes,baguette,bake,baker,' +
+ 'bakery,bakery window,balance,balance beam,balcony,ball,ballerina,ballet,balloon,balloon animal,ballroom,bamboo,banana,' +
+ 'banana split,bandage,bandage box,bandaid,bandstand,banister,banjo,baobab,barbecue,barber,barcode,bargain bin,bark,barn,' +
+ 'barn door,barn owl,barnacle,barracks,barrel,baseball,baseball bat,basement,basket,basketball,basketball hoop,bassoon,bat,' +
+ 'bat wing,bathrobe,bathroom,bathtub,battering ram,battery,bauble,beach,beak,beaker,beanie,beard,beaver,bed,bedroom,bee,' +
+ 'beech,beehive,beetle,beetroot,bell,bell pepper,bell tower,belly,belt,belt buckle,bench,beret,bicycle,bike,bike rack,' +
+ 'billiards,bin,bingo,binoculars,birch,bird,bird feeder,birdbath,birdhouse,birthday,birthday cake,bison,black cat,' +
+ 'black hole,blackberry,blackboard,blackcurrant,blackout,blacksmith,blanket,blazer,blender,blender jug,blimp,blister,' +
+ 'blizzard,blood,blossom,blouse,bluebell,blueberry,boar,board game,boat,boathouse,bobsleigh,bodyguard,bog,bollard,bone,' +
+ 'bonfire,bongo,book shop,bookmark,bookshelf,bookshelf hunt,bookworm,boomerang,boots,bored,bottle,bottle opener,' +
+ 'bottle warmer,boulder,bounce,bouncy ball,bow,bow tie,bow tie knot,bowl,bowler hat,bowling,bowling alley,box,boxing,' +
+ 'boxing glove,bracelet,brain,branch,brave,bread,bread bin,break a leg,breeze,brick,bride,bridge,briefcase,broccoli,brooch,' +
+ 'brook,broom,brownie,bruise,brussels sprout,bubble,bubble bath,bubble wand,bucket,buckle,bud,buffalo,builder,' +
+ 'building blocks,bulldog,bulldozer,bumblebee,bumper,bungalow,bungee jump,bunk bed,bunker,bunny,bunsen burner,buoy,burger,' +
+ 'burglar,burrito,bus,bus depot,bus stop,bush,butcher,butchers shop,butter,butter dish,buttercup,butterfly,butternut squash,' +
+ 'cabbage,cabin,cabinet,cable car,cactus,cafe,cage,cake stand,calculator,calendar,camel,camera,camouflage,camp fire ring,' +
+ 'campfire,campsite,can opener,canal,canary,candelabra,candle,candle lantern,candy,candy cane,cannon,canoe,canyon,cap,cape,' +
+ 'cappuccino,captain,car,car park,caramel,caravan,cardboard box,cardigan,carnival,carol singer,carpenter,carpet,carriage,' +
+ 'carrot,cart,cartwheel,cash point,cash register,cashew,castle,cat,cat nap,catapult,caterpillar,cathedral,cattle grid,' +
+ 'cattle pen,cauldron,cauliflower,cave,caveman,cavern,cedar,ceiling fan,celery,cellar,cello,centaur,cereal,chain,chainmail,' +
+ 'chair,chalk,chalkboard,championship,chandelier,changing mat,charades,chariot,checkmate,cheek,cheer,cheerleader,cheese,' +
+ 'cheese board,cheeseburger,cheesecake,cheetah,chef,chemist shop,cherry,chess,chess piece,chest,chestnut,chew,chick,chicken,' +
+ 'chilli,chimney,chimney sweep,chimpanzee,chin,chipmunk,chocolate,chop,chopping board,chopsticks,christmas tree,church,' +
+ 'cinema,cinnamon,circuit,circus,clam,clap,clarinet,claw,clementine,cliff,climb,climbing wall,clipboard,cloak,clock,' +
+ 'clocktower,closet,clothes peg,clothesline,cloud,cloudburst,clover,clown,coach,coat,coat hanger,coat of arms,cobra,cobweb,' +
+ 'cocktail shaker,cocoa,coconut,cocoon,cocoon silk,coffee,coffee grinder,coffee pot,coffee shop,coin,colander,cold feet,' +
+ 'colosseum,comb,comet,compass,compost heap,computer,concert,condor,conductor,cone,confused,conservatory,constellation,' +
+ 'convertible,cook,cookie,cookie cutter,coral,corkscrew,corn,corn cob,corner shop,corridor,cosmonaut,costume,cottage,couch,' +
+ 'couch potato,cough,countdown,courthouse,cow,cowboy,cowboy hat,coyote,crab,cracker,cranberry,crane,crate,crater,crawl,' +
+ 'crayon,crescent moon,cricket,cricket bat,crocodile,crocus,croissant,croquet,crossbow,crossword,crossword clue,crow,' +
+ 'crowbar,crown,crumpet,crutch,crutches,cry,cube,cucumber,cuddly toy,cuff link,cup,cupboard,cupcake,curling,curry,curtain,' +
+ 'cushion,custard,cyclist,cyclops,cymbal,cypress,daffodil,daisy,dam,dance,dancer,dandelion,dandelion clock,danger,dart,' +
+ 'dartboard,darts,dashboard,date,dawn,dead end,deckchair,deer,denim,dentist,desert,desk,detective,detour,dew,diamond,dice,' +
+ 'dice roll,didgeridoo,dig,digger,dimple,dinghy,dingo,dining room,dinosaur,discus,dishwasher,dive,diver,diving bell,' +
+ 'diving board,dizzy,dna,dock,doctor,dodgeball,dodo,dog,doghouse,doll,dolls house,dolphin,domino,domino chain,donkey,donut,' +
+ 'doodle,door,doorbell,doorknob,doormat,double bass,dragon,dragonfly,dragonfruit,drainpipe,drawbridge,drawbridge gate,' +
+ 'drawer,dream,dress,dressing room,driftwood,drill,drink,drizzle,drone,drool,druid,drum,drummer,drumstick,dryer,duck,' +
+ 'dumbbell,dumbbell rack,dummy,dumpling,dune,dungarees,dusk,dust storm,duster,dustpan,duvet,dwarf,e-scooter,eagle,ear,' +
+ 'earbuds,early bird,earmuffs,earring,earth,earthquake,easel,easter egg,echo,eclipse,eel,egg,egg timer,egg whisk,eggcup,' +
+ 'eggplant,elbow,elderberry,electrician,electricity,elephant,elevator,elf,elk,elm,embarrassed,emperor,emu,envelope,eraser,' +
+ 'escalator,escape,espresso,eucalyptus,excited,exercise,exercise book,exhaust pipe,exit,explorer,eye chart,eyebrow,eyelash,' +
+ 'fable,factory,faint,fairy,fairy tale,falcon,fan,fang,farm,farm gate,farmer,farmhouse,faucet,fawn,feather,fence,fencing,' +
+ 'fern,ferret,ferry,festival,fidget spinner,field,fig,filing cabinet,fin,finger,finger puppet,fingernail,finish line,fire,' +
+ 'fire extinguisher,fire hydrant,fire station,fire truck,firefighter,firefly,fireplace,firewood,firework,first aid,fish,' +
+ 'fish market,fish slice,fishbowl,fisherman,fishing boat,fishing rod,fist,fitness tracker,fizzy drink,flag,flagpole,' +
+ 'flamingo,flashlight,flask,flea,flip flops,float,flood,florist,flower,flower stall,flowerpot,flute,fly,foal,fog,fog bank,' +
+ 'fold,folder,food truck,football,footbridge,forecast,forehead,forest,fork,forklift,fortress,fortune cookie,fossil,fountain,' +
+ 'fox,foxglove,fragile,frame,freckles,french fries,fridge,frog,front door,frost,fruit,fruit stand,frying pan,fudge,' +
+ 'full moon,funnel,fur,fur coat,galaxy,gale,galleon,gallery,gallop,games console,garage,garden,garden centre,garden fork,' +
+ 'garden gnome,garden hose,gardener,gargoyle,garland,garlic,garlic press,gate,gazebo,gazelle,gecko,genie,gerbil,geyser,' +
+ 'ghost,giant,gift,gift shop,giggle,gingerbread,giraffe,glacier,gladiator,glass,glasses,glider,globe,glove,glue,gnome,' +
+ 'go-kart,goal net,goalkeeper,goalpost,goat,goblet,goblin,goggles,gold,goldfish,golf,golf ball,gondola,gong,goose,' +
+ 'gooseberry,gorge,gorilla,gown,gramophone,grapefruit,grapes,grass,grasshopper,grater,gravestone,gravity,gravy,green thumb,' +
+ 'greenhouse,griffin,grill,grove,grumpy,guardrail,guava,guinea pig,guitar,gum,gymnasium,gymnast,gymnastics,hail,hailstone,' +
+ 'hair,hair band,hair clip,hair salon,hairbrush,hairdresser,hairdryer,hallway,ham,hammer,hammock,hamster,hand,handbag,' +
+ 'handcuffs,handkerchief,handlebar,handshake,hang glider,hangar,hangman,happy,harbour,hard hat,hare,harp,harvest,hat,' +
+ 'hatchet,haunted house,hawk,hawthorn,hay,haystack,hazard,hazel,hazelnut,head in the clouds,headlight,headline,headphones,' +
+ 'headset,hearing aid,heart,heat haze,hedge,hedge trimmer,hedgehog,hedgerow,heel,helicopter,helmet,helmet visor,hermit,' +
+ 'heron,hiccup,hide,hide and seek,high chair,high five,highlighter,highway,hiker,hill,hinge,hip,hippo,hive,hockey,' +
+ 'hockey stick,hole punch,holly,honey,honeycomb,honeysuckle,hoodie,hoof,hook,hopscotch,horizon,horn,hornet,horse,' +
+ 'horse chestnut,horseshoe,hose,hospital,hot air balloon,hot chocolate,hot potato,hotdog,hotel,hourglass,house,hoverboard,' +
+ 'hovercraft,hug,hula hoop,hull,hum,hungry,hunter,hurdle,hurricane,hut,hyacinth,hyena,ice cream,ice cream van,ice cube,' +
+ 'ice hockey,ice rink,ice skate,iceberg,iced tea,icicle,igloo,ignition,iguana,imp,index card,inhaler,ink,insect,iris,iron,' +
+ 'ironing board,island,itch,ivy,jack in the box,jack o lantern,jackal,jacket,jackpot,jaguar,jam,jam jar,jar,jasmine,javelin,' +
+ 'jaw,jealous,jeans,jeep,jelly,jellyfish,jester,jet,jet ski,jetty,jigsaw,jigsaw box,jigsaw piece,jockey,jog,jousting,judge,' +
+ 'judo,jug,juggle,juggler,juice,jukebox,jump,jumpsuit,jungle,kale,kaleidoscope,kaleidoscope tube,kangaroo,karaoke,karate,' +
+ 'kayak,kebab,kennel,ketchup,kettle,kettle lid,key,key fob,keyboard,keyhole,keyring,kick,kickstand,kilt,king,kiosk,kite,' +
+ 'kite surfing,kitten,knee,kneel,knife,knife block,knight,knit,knot,knuckle,koala,kraken,laboratory,ladder,ladle,ladybug,' +
+ 'lagoon,lake,lamb,lamp,lamppost,lampshade,landing,landslide,lantern,lanyard,laptop,larch,larder,lasagna,laser,lasso,laugh,' +
+ 'launderette,lava,lavender,lawn mower,lazy,leaf,leapfrog,leash,leek,leg,leggings,lemon,lemon squeezer,lemonade,' +
+ 'lemonade stand,lemur,leopard,leotard,leprechaun,letter,letterbox,lettuce,lever,library,lick,lid,life jacket,lifeboat,' +
+ 'lifeguard,light bulb,lighter,lighthouse,lighthouse keeper,lightning,lightning bolt,lily,lily pad,lime,limousine,limp,lion,' +
+ 'lip,lipstick,liquorice,living room,lizard,llama,lobster,lock,locker,locomotive,log,lollipop,lonely,lorry,lottery ticket,' +
+ 'lotus,loudspeaker,luggage,lullaby,lumberjack,lunchbox,lungs,lychee,lynx,macaroni,macaw,magazine,magician,magnet,' +
+ 'magnet bar,magnifying glass,magnolia,magpie,mailbox,mall,mallard,mallet,mammoth,manatee,mandarin,mandolin,mane,mango,' +
+ 'manhole,mannequin,mansion,map,maple,maple syrup,maracas,marathon,marble,marble run,marbles,march,marching band,marigold,' +
+ 'marker,market,marmalade,marsh,marshmallow,mask,mast,matchbox,mattress,mayor,maze,meadow,measuring jug,meatball,mechanic,' +
+ 'medal,meditate,meerkat,megaphone,melon,melt,meringue,mermaid,message in a bottle,meteor,metronome,microchip,microphone,' +
+ 'microscope,microwave,midnight,milestone,milk,milkshake,milky way,mill,mime,miner,minibus,minotaur,mint,mirage,mirror,mist,' +
+ 'mistletoe,mitten,mixing bowl,moat,moat bridge,mole,molecule,monastery,money,money clip,mongoose,monk,monkey,monocle,' +
+ 'monorail,monsoon,monster,monument,moon,moon rock,moor,moose,mop,moped,mosque,mosquito,moss,motel,moth,motorbike,motorboat,' +
+ 'mountain,mountain range,mountaineer,mouse,mouse pad,mousetrap,moustache,mouth,mud,muffin,muffin tin,mug,mule,mulled wine,' +
+ 'mummy,muscle,museum,mushroom,music,musician,musket,mustard,mystery,nachos,nail,nail file,name badge,name tag,napkin,nappy,' +
+ 'narwhal,nebula,neck,necklace,nectar,nectarine,needle,nervous,nest,nesting doll,net,netball,newsagent,newspaper,newt,night,' +
+ 'night owl,nightgown,nightmare,ninja,no entry,nomad,noodles,nose,notebook,notepad,noughts,number plate,nurse,nursery,' +
+ 'nursery school,nut,nutcracker,nutcracker tool,oak,oar,oasis,oatmeal,oboe,observatory,ocean,ocelot,octopus,odometer,office,' +
+ 'ogre,oil,oil lamp,okra,olive,omelette,onion,opera,orange,orangutan,orbit,orca,orchard,orchestra,orchid,organ,origami,' +
+ 'ornament,ostrich,otter,out of order,oven,oven glove,oven mitt,over the moon,overalls,overcast,owl,ox,oxygen,oyster,' +
+ 'pacifier,paddle,padlock,pagoda,paint,paintbrush,painter,palace,palm,palm frond,palm tree,pan,pancake,panda,panic,pansy,' +
+ 'panther,pantry,pants,papaya,paper,paper bag,paper plane,paperclip,parachute,parade,parakeet,paramedic,parasol,park bench,' +
+ 'parking meter,parrot,parsnip,party,passion fruit,passport,pasta,pastry,path,pavilion,paw,paw print,pea pod,peace,peach,' +
+ 'peacock,peanut,peanut butter,pear,pearl,pebble,pedal,pelican,pen,pencil,pencil case,pencil sharpener,pendulum,penguin,' +
+ 'peony,pepper,pepper grinder,perfume,periscope,persimmon,pet shop,petal,petri dish,petrol pump,petrol station,pharaoh,' +
+ 'pharmacy,pheasant,phoenix,phone,phone box,phone case,photo album,photographer,pianist,piano,pickle,pickup truck,picnic,' +
+ 'picnic table,pie,pie dish,piece of cake,pier,pig,pigeon,piggy bank,piggyback,piglet,pigtail,pill,pillow,pillowcase,pilot,' +
+ 'pin,pinch,pine cone,pine needle,pineapple,ping pong,ping pong bat,pinwheel,pipe,piranha,pirate,pitchfork,pixie,pizza,' +
+ 'pizza cutter,planet,plank,plant,plant pot,plantain,plaster,plaster cast,plate,plateau,platypus,play dough,play mat,' +
+ 'playground,playing card,playing cards,pliers,plug,plum,plumber,plunger,pocket,pocket square,pocket watch,podium,poet,' +
+ 'pogo stick,poker chip,polar bear,police station,pollen,pomegranate,pond,pony,ponytail,poodle,pool table,pop up book,' +
+ 'popcorn,poplar,poppy,porch,porcupine,porridge,port,porthole,post office,postbox,postcard,poster,postman,pot,potato,' +
+ 'potato masher,pothole,potter,pouch,pour,power bank,pram,prawn,present,pretzel,primrose,prince,printer,prism,prison,' +
+ 'professor,projector,propeller,protractor,proud,pruning shears,pub,pudding,puddle,puffin,pull,pulley,puma,pumpkin,punch,' +
+ 'puppet,puppeteer,puppy,purse,push,pushchair,puzzle,puzzle piece,pyjamas,pyramid,python,qr code,quail,quarry,quay,queen,' +
+ 'quiche,quicksand,quill,quilt,quince,quiver,quiz,quiz buzzer,rabbit,raccoon,race,racket,radiator,radio,radish,raffle,raft,' +
+ 'rag doll,railway,rain,rain cloud,rainbow,rainbow arch,raincoat,rainforest,raining cats and dogs,raisin,rake,ram,ramp,' +
+ 'rapids,raspberry,rat,rattle,rattle toy,raven,ravine,razor,receipt,recipe,record player,record shop,recorder,recycle,' +
+ 'redwood,reef,referee,register,reindeer,relay race,remote,remote control,repair shop,report card,reporter,rescue,' +
+ 'restaurant,rhino,rhubarb,rib,ribbon,rice,rickshaw,riddle,ride,ridge,ring,river,riverbank,road,roadrunner,robe,robin,robot,' +
+ 'rock pool,rocket,rocking chair,rocking chair toy,rocking horse,rodeo,roll,roller blade,roller coaster car,roller skates,' +
+ 'rollercoaster,rolling mat,rolling pin,roof,rooster,root,root beer,rope,rose,roundabout,rounders,router,row,rowan,rowboat,' +
+ 'rowing machine,rubber band,rubber duck,rucksack,rudder,rug,rugby,rugby ball,ruins,ruler,running track,sack,sad,saddle,' +
+ 'safari,safe,safety pin,sail,sailboat,sailing,sailor,salad,salamander,salami,sale,salmon,salt,salt shaker,salute,samurai,' +
+ 'sand,sandal,sandbar,sandcastle,sandpaper,sandpit,sandstorm,sandwich,sapling,sari,sash,satchel,satellite,saucepan,saucer,' +
+ 'sausage,sausage roll,savannah,saw,sawmill,saxophone,scaffolding,scales,scallop,scarecrow,scared,scarf,school,schoolbag,' +
+ 'scientist,scissors,scone,scooter,scooter wheel,scoreboard,scorpion,scrabble tile,scratch,scream,screw,screwdriver,scroll,' +
+ 'scuba diving,sculptor,sea monster,seagull,seahorse,seal,seashell,seatbelt,seaweed,seed,seed packet,seesaw,segway,' +
+ 'selfie stick,sequoia,set square,sew,sewing machine,shack,shadow,shallot,shampoo,shark,shawl,shed,sheep,sheepdog,' +
+ 'sheet music,shelf,shell pattern,shepherd,shin,shin pad,ship,shipwreck,shirt,shiver,shoe,shoe horn,shoe shop,shoelace,' +
+ 'shooting star,shopping trolley,shore,shortbread,shorts,shoulder,shoulder bag,shout,shovel,shower,shrimp,shrub,shrug,' +
+ 'shuttlecock,shy,sideburns,sidecar,siege tower,sieve,sieve pan,signpost,silence,silhouette,silo,sing,singer,sink,sinkhole,' +
+ 'sitar,skateboard,skatepark,skater,skeleton,skewer,ski,ski lift,ski pole,skier,skip,skipping game,skipping rope,skirt,' +
+ 'skittles,skull,skunk,sky,skyscraper,sled,sledge,sleep,sleeping bag,sleepover,sleepy,sleet,sleigh,slide,slide rule,sling,' +
+ 'slingshot,slip,slippers,sloth,slug,smart speaker,smartwatch,smile,smoke,smoothie,snail,snake,snakes and ladders,' +
+ 'snare drum,sneeze,sniff,snooker,snore,snorkel,snout,snow,snow globe,snow sled,snowball fight,snowboard,snowdrift,snowdrop,' +
+ 'snowfall,snowflake,snowman,snowmobile,snowplough,soap,soccer,sock,soda,sofa,softball,solar panel,solar system,soldier,' +
+ 'sombrero,somersault,sorcerer,soup,soup ladle,space station,spaceship,spacesuit,spacewalk,spade,spaghetti,spanner,' +
+ 'spare wheel,sparkler,sparrow,spatula,speaker,speed bump,speed limit,speedboat,spelling bee,sphinx,spice rack,spider,' +
+ 'spill the beans,spin,spinach,spine,spinning top,splash,spoiler,spoke,sponge,spoon,spotlight,spring,sprinkler,sprint,' +
+ 'spruce,spy,squash,squat,squid,squirrel,stable,stadium,stag,stage,stagecoach,staircase,stairs,stalactite,stallion,stamp,' +
+ 'stapler,star,stare,starfish,starfruit,starting gun,station,statue,steak,steam,steam train,steamer basket,steamroller,' +
+ 'stepladder,stethoscope,stew,stilt,stilts,stingray,stocking,stockings,stomach,stone,stool,stop sign,stopwatch,stork,storm,' +
+ 'storm cloud,storybook,stove,straw,strawberry,stream,street,streetlight,stretch,studio,study,stumble,submarine,subway,' +
+ 'sugar,sugar bowl,suit,suit of armour,suitcase,summer,summit,sumo,sun,sun visor,sunbeam,sunburn,sundial,sunflower,' +
+ 'sunflower seed,sunglasses,sunhat,sunrise,sunset,sunshine,superhero,supermarket,surf,surf wax,surfboard,surfer,surprised,' +
+ 'sushi,suspenders,swallow,swamp,swan,sweater,sweep,sweet shop,sweetcorn,swim,swimmer,swimming cap,swimming pool,swimsuit,' +
+ 'swing,sword,swordfish,sycamore,syringe,table,table tennis,tablecloth,taco,tadpole,tail,tail feather,tail light,tailor,' +
+ 'tailor shop,talent show,talon,tambourine,tandem,tangerine,tank,tape,tape measure,tapir,tarantula,tart,tattoo,taxi,tea,' +
+ 'tea kettle,tea strainer,teabag,teacher,teacup,teapot,teaspoon,teddy bear,teddy picnic,teeth,teething ring,telegraph,' +
+ 'telegraph pole,telephone,telescope,television,temple,tennis,tennis ball,tent,termite,terrace,test tube,textbook,thaw,' +
+ 'theatre,thermometer,thermometer bulb,thermostat,thief,thimble,thirsty,thistle,thorn,thread,throne,thumb,thunder,' +
+ 'thunderstorm,tiara,ticket,tickle,ticklish,tide,tie,tie clip,tiger,tightrope,time machine,timetable,tin opener,tinsel,' +
+ 'tiptoe,tire,tired,toad,toast,toast rack,toaster,toboggan,toe,toffee,toilet,tollbooth,tomato,tongs,tongue,toolbelt,toolbox,' +
+ 'tooth,toothbrush,toothpaste,toothpick,top hat,torch,tornado,tortilla,tortoise,toucan,touchscreen,tourist,tournament,' +
+ 'tow truck,towel,tower,toy,toy drum,toy shop,toy soldier,tractor,traffic cone,traffic jam,traffic light,train,' +
+ 'train platform,train set,tram,trampoline,travel card,tray,treadmill,treasure,treasure chest,treasure hunt,treasure map,' +
+ 'trebuchet,tree,treehouse,trellis,trench coat,triangle,trick or treat,tricycle,trip,tripod,trivet,trivia,troll,trombone,' +
+ 'trophy,trophy shelf,trout,truck,trumpet,tsunami,tuba,tug of war,tugboat,tulip,tuna,tundra,tuning peg,tunnel,turban,turkey,' +
+ 'turnip,turnstile,turret,turtle,tusk,tutu,tuxedo,tweezers,twig,twilight,twirl,type,typewriter,ufo,ukulele,umbrella,' +
+ 'umbrella stand,umpire,under the weather,unicorn,unicycle,uniform,universe,urn,usb stick,utility room,vacuum,valley,' +
+ 'vampire,van,vanilla,vase,vault,vegetable,vegetable peeler,veil,vending kiosk,vending machine,veranda,vest,vet,viking,' +
+ 'village,vine,vinegar,vineyard,viola,violet,violin,volcano,volleyball,voltmeter,vr headset,vulture,waffle,waffle iron,' +
+ 'wagon,waist,waistcoat,waiter,waiting room,walking stick,wallaby,wallet,wallet chain,wallpaper,walnut,walrus,wand,wardrobe,' +
+ 'warehouse,warning,warrior,warthog,washing machine,wasp,watch,water bottle,water pistol,water polo,water slide,water tower,' +
+ 'waterfall,watering can,watering hole,waterlily,watermelon,watermill,wave,weasel,weather station,weather vane,weaver,web,' +
+ 'webcam,wedding,weed,weightlifting,welder,wellies,werewolf,wetsuit,whale,wheat,wheel,wheelbarrow,wheelchair,whirlpool,' +
+ 'whirlwind,whirlwind gust,whisk,whisker,whisper,whistle,whistle blow,whiteboard,wifi,wig,wildebeest,wildfire,willow,wind,' +
+ 'wind sock,wind tunnel,wind up toy,windbreaker,windchime,windmill,window,windowsill,windscreen,wine,wine glass,wine rack,' +
+ 'wing,wing mirror,wingspan,wink,winter,wiper,wire,wishbone,wisteria,witch,witch hat,wizard,wok,wolf,wombat,wood,woodland,' +
+ 'woodpecker,wool,word search,workbench,workshop,worm,worried,wrapping paper,wreath,wrench,wrestle,wrestler,wrinkle,wrist,' +
+ 'wristband,write,x-ray,xylophone,yacht,yak,yam,yard,yarn,yawn,yell,yeti,yew,yo yo string,yo-yo,yoga,yoghurt,yolk,zebra,' +
+ 'zebra crossing,zeppelin,zigzag,zip,zipper,zodiac,zombie,zoo,zookeeper,zucchini').split(',');
 
 /* ---------------- state shared by every client ---------------- */
 let G = {
@@ -456,7 +529,8 @@ let ops = [];                   // every drawing op on the current board, in hos
 
 /* host-only bookkeeping */
 const H = { order:[], turnIdx:0, word:'', choices:[], deadline:0, lastSec:-1,
-            revealed:new Set(), hintAt:[], gains:{}, guessOrder:[], used:new Set(), pool:[] };
+            revealed:new Set(), hintAt:[], gains:{}, guessOrder:[],
+            used:new Set(), usedSeq:[], pool:[] };      // usedSeq is the same words, oldest first
 
 /* ---------------- DOM ---------------- */
 const $ = id => document.getElementById(id);
@@ -878,13 +952,34 @@ const slim = () => G.players.map(p => ({ id:p.id, name:p.name, color:p.color, sc
 /* =======================================================================
    Host: the rules of the game.
    ======================================================================= */
+/* The words this browser has handed out, kept on disk. In memory alone the
+   history died on every page reload, so a host who refreshed between games
+   started the pool from scratch and the early words came straight back —
+   which is what "we keep getting the same word" actually looked like. */
+const USED_KEY = 'scribble.used';
+function loadUsed() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(USED_KEY) || '[]'); } catch (e) {}
+  if (!Array.isArray(saved)) return;
+  setUsed(saved.filter(w => typeof w === 'string').slice(-4000));
+}
+function setUsed(list) {
+  H.usedSeq = list;
+  H.used = new Set(list);
+}
+function retire(words) {
+  for (const w of words) if (!H.used.has(w)) { H.used.add(w); H.usedSeq.push(w); }
+  try { localStorage.setItem(USED_KEY, JSON.stringify(H.usedSeq)); } catch (e) {}
+}
+
 function buildPool() {
   const extra = String(G.settings.custom || '')
     .split(/[,\n]/).map(w => w.trim().replace(/\s+/g, ' ')).filter(w => w.length > 1 && w.length < 32);
   H.pool = G.settings.onlyCustom && extra.length >= 3 ? extra : WORDS.concat(extra);
-  /* Keep what a room has already seen across games — only forget words that
-     are no longer in the pool at all, e.g. after the custom list is edited. */
-  for (const w of [...H.used]) if (!H.pool.includes(w)) H.used.delete(w);
+  /* Keep what this browser has already seen — only forget words that are no
+     longer in the pool at all, e.g. after the custom list is edited. */
+  const inPool = new Set(H.pool);
+  setUsed(H.usedSeq.filter(w => inPool.has(w)));
 }
 /* Every word that gets OFFERED is marked used, not just the one that gets
    picked. Otherwise the two nobody chose drop straight back in the hat and
@@ -893,11 +988,18 @@ function buildPool() {
    longer hand back a word the room has already had. */
 function pickWords(n) {
   let fresh = H.pool.filter(w => !H.used.has(w));
-  if (fresh.length < n) { H.used.clear(); fresh = H.pool.slice(); }   // the room has been through the lot
+  if (fresh.length < n) {
+    /* Been through the lot. Rather than forgetting everything at once — which
+       hands back a word from the turn before — keep the most recent fifth on
+       the bench and reopen the rest. */
+    setUsed(H.usedSeq.slice(-Math.max(n, Math.floor(H.pool.length / 5))));
+    fresh = H.pool.filter(w => !H.used.has(w));
+    if (fresh.length < n) { setUsed([]); fresh = H.pool.slice(); }
+  }
   const out = [];
   while (out.length < n && fresh.length) out.push(fresh.splice(Math.random() * fresh.length | 0, 1)[0]);
-  for (const w of out) H.used.add(w);
   if (!out.length) out.push('scribble');
+  retire(out);
   return out;
 }
 function patternOf(word, revealed) {
@@ -1559,6 +1661,7 @@ function saveMe() {
 }
 
 function init() {
+  loadUsed();
   buildTools();
   buildSwatches();
   wireRail();
